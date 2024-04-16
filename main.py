@@ -26,3 +26,24 @@ font = {'family': 'serif',
           'size': 16,
           }
 
+global first_term, second_term, third_term, V_ph, V_ph_k
+
+N = 2*2048
+k_max = N
+L = 40
+
+#del r_discretization, k_discretization
+dl = L / N
+l = np.linspace(-L,L,N)
+X, Y = np.meshgrid(l,l)
+
+g = np.ones((N,N), dtype=np.complex64)
+S = np.ones((N,N), dtype=np.complex64)
+
+#Initializing the terms
+first_term = np.ones((N,N), dtype=np.complex64)
+second_term = np.ones((N,N), dtype=np.complex64)
+third_term = np.ones((N,N), dtype=np.complex64)
+
+V_ph = np.ones((N,N), dtype=np.complex64)
+V_ph_k = np.ones((N,N), dtype=np.complex64)
