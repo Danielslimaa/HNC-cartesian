@@ -60,6 +60,16 @@ int main(void){
 
   printer_vector(x, y, U, "U.dat", h_N);  
   
+  dim3 threadsPerBlock(h_N, h_N);
+  dim3 numBlocks(N / threadsPerBlock.x, N / threadsPerBlock.y);
+  DCT_x<<<numBlocks, threadsPerBlock>>>(U, U);
+  DCT_y<<<numBlocks, threadsPerBlock>>>(U, U);
+  printer_vector(x, y, U, "FFT_U.dat", h_N);  
+  DCT_x<<<numBlocks, threadsPerBlock>>>(U, U);
+  DCT_y<<<numBlocks, threadsPerBlock>>>(U, U);
+  rescaling<<<Blocks_N, ThreadsPerBlock_N>>>(U);
+  printer_vector(x, y, U, "IFFT_FFT_U.dat", h_N);  
+
   cudaDeviceReset();
   delete[] x;
   delete[] y;

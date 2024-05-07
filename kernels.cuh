@@ -184,3 +184,11 @@ __global__ void initialize_U(double * x, double * y, double * U)
         U[i] = exp(-x[i] * x[i] - y[i] * y[i]);
     }
 }
+
+__global__ void rescaling(double * U)
+{
+    CUDA_GRID_STRIDE_LOOP(i, N * N)
+    {
+        U[i] /= (double)(N * N);
+    }
+}
