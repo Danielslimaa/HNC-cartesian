@@ -148,16 +148,17 @@ __global__ void DCT_y(
     }
 }
 
-void printer_vector(double *vetor, const char *name, int h_N)
+void printer_vector(double * x, double * y, double *vetor, const char *name, int h_N)
 {
     double * h_vetor = new double[h_N * h_N];
+
     cudaMemcpy(h_vetor, vetor, sizeof(double) * h_N * h_N, cudaMemcpyDeviceToHost);
 	std::ofstream myfile;
 	myfile.open(name);
 	for (int i = 0; i < h_N * h_N; ++i)
 	{
-		myfile << h_vetor[i] << "\n";
-        std::cout << h_vetor[i] << std::endl;
+		myfile << x[i] << " " << y[i] << " " << h_vetor[i] << "\n";
+        //std::cout << h_x[i] << "," << h_y[i] << "," << h_vetor[i] << std::endl;
 	}
 	myfile.close();
     delete[] h_vetor;
@@ -178,8 +179,8 @@ __global__ void initialize_geometry(double * x, double * y)
 
 __global__ void initialize_U(double * x, double * y, double * U)
 {
-    CUDA_GRID_STRIDE_LOOP(i, N)
+    CUDA_GRID_STRIDE_LOOP(i, N * N)
     {
-        U[i] = 10;//exp(-x[i] * x[i] - y[i] * y[i]);
+        U[i] = exp(-x[i] * x[i] - y[i] * y[i]);
     }
 }

@@ -6,10 +6,11 @@
 #include <fstream>
 #include <stdio.h>
 #include <cstdlib>
+#include <omp.h>
 #include "kernels.cuh"
 
 int main(void){
-  int h_N = 1 << 10;
+  int h_N = 1 << 8;
   double h_L = 40;
   double h_h = h_L / h_N;
   double h_rho = 1;
@@ -32,19 +33,36 @@ int main(void){
 
   printf("Blocks_N = %d, ThreadsPerBlock_N = %d\n", Blocks_N, ThreadsPerBlock_N);
 
-  double * x, * y, * U;
-
-  cudaMalloc(&x, sizeof(double) * h_N * h_N);
-  cudaMalloc(&y, sizeof(double) * h_N * h_N);
+  double * U;
   cudaMalloc(&U, sizeof(double) * h_N * h_N);
 
-  initialize_geometry<<<Blocks_N, ThreadsPerBlock_N>>>(x, y);
-  cudaDeviceSynchronize();
-  initialize_U<<<Blocks_N, ThreadsPerBlock_N>>>(x, y, U);
-  cudaDeviceSynchronize();
+  double * x = new double[h_N * h_N];
+  double * y = new double[h_N * h_N];
 
-  printer_vector(U, "U.dat", h_N);
+  #pragma omp parallel for
+  for (int i = 0; i < h_N; i++)
+  {
+    for (int j = 0; j < h_N; j++)
+    {
+      x[i * h_N + j] = (-h_L / 2.) + (i - 1) * h_h;
+      y[i * h_N + j] = (-h_L / 2.) + (j - 1) * h_h;
+    }
+  }
+
+  double * h_U = new double[h_N * h_N];
+  #pragma omp parallel for
+  for (int i = 0; i < h_N * h_N; i++)
+  {
+    h_U[i] = exp( -x[i] * x[i] - y[i] * y[i] );
+  }  
+
+  cudaMemcpy(U, h_U, sizeof(double) * h_N * h_N, cudaMemcpyHostToDevice);
+
+  printer_vector(x, y, U, "U.dat", h_N);  
   
-  return 0;
   cudaDeviceReset();
+  delete[] x;
+  delete[] y;
+  delete[] h_U;
+  return 0;
 }
