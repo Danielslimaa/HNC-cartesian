@@ -55,7 +55,7 @@ __device__ double Shared_mem_sum(double shared_vals[])
 }
 
 __global__ void DCT_x(
-	const double *__restrict__ X,
+	double *__restrict__ X,
 	double *__restrict__ Y
     )
 {
@@ -102,7 +102,7 @@ __global__ void DCT_x(
 }
 
 __global__ void DCT_y(
-	const double *__restrict__ X,
+	double *__restrict__ X,
 	double *__restrict__ Y
     )
 {
