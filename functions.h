@@ -76,6 +76,15 @@ void potential_U(double * x, double * y, double * V)
   }
 }
 
+void compute_Vph(double * k2, double * S, double * Vph)
+{
+  #pragma omp parallel for 
+  for (int i = 0; i < N * N; i++)
+  {
+    Vph[i] = -0.25 * k2[i] * ( 2. * S[i] + 1. ) * ( 1. - (1. / S[i]) ) * ( 1. - (1. / S[i]) ); 
+  }  
+}
+
 double compute_error(fftw_complex * new_g, fftw_complex * g)
 {
   double sum, tmp= 0;
@@ -87,5 +96,7 @@ double compute_error(fftw_complex * new_g, fftw_complex * g)
   } 
   return sum * h * h / dt;
 }
+
+
 
 #endif
