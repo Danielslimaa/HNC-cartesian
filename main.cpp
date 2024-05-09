@@ -7,37 +7,46 @@
 #include <cstdlib>
 #include <omp.h>
 #include <fftw3.h>
+#include "functions.h"
 
 long int N;
+double inv_N2;
 double L; 
 double h;
-
+double U;
+double rho;
+double dt;
 //g++ main.cpp -w -lfftw3_omp -lfftw3 -fopenmp -lm -O3
 
 int main(void)
 {
-
   N = 1 << 8;
   L = 40.;
   h = L / (double)N;
 
-  double * x, * y, * U, * g, * S, * Vph;
+  U = 10;
+  rho = 1;
+
+  double * x, * y, * kx, * ky, * k2, * V, * g, * S, * Vph;
   x = (double * )fftw_malloc(N * N * sizeof(double));
   y = (double * )fftw_malloc(N * N * sizeof(double));
-  U = (double * )fftw_malloc(N * N * sizeof(double));
+  kx = (double * )fftw_malloc(N * N * sizeof(double));
+  ky = (double * )fftw_malloc(N * N * sizeof(double));
+  k2 = (double * )fftw_malloc(N * N * sizeof(double));
+  V = (double * )fftw_malloc(N * N * sizeof(double));
   g = (double * )fftw_malloc(N * N * sizeof(double));
   S = (double * )fftw_malloc(N * N * sizeof(double));
   Vph = (double * )fftw_malloc(N * N * sizeof(double));
 
-    
-  #pragma omp parallel for
-  for (int i = 0; i < N; i++)
+  geometry(x, y, kx, ky, k2);
+  potential_U(x, y, V);  
+  printer_vector(x, y, V, "V.dat");
+
+  bool condition = true; 
+
+  while(condition)
   {
-    for (int j = 0; j < N; j++)
-    {
-      x[i * N + j] = (-L / 2) + (i - 1) * h;
-      y[i * N + j] = (-L / 2) + (j - 1) * h;
-    }
+    
   }
 
   void fftw_cleanup_threads(void);
