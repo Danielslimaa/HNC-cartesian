@@ -9,14 +9,25 @@ extern double U;
 extern double rho;
 extern double dt;
 
-void printer_vector(double * x, double * y, double *vetor, const char *name)
+void printer_field(double * x, double * y, double *vetor, const char *name)
 {
 	std::ofstream myfile;
 	myfile.open(name);
 	for (int i = 0; i < N * N; ++i)
 	{
 		myfile << x[i] << " " << y[i] << " " << vetor[i] << "\n";
-        //std::cout << h_x[i] << "," << h_y[i] << "," << h_vetor[i] << std::endl;
+	}
+	myfile.close();
+	return;
+}
+
+void printer_field_transversal_view(double * x, double * y, double *vetor, const char *name)
+{
+	std::ofstream myfile;
+	myfile.open(name);
+	for (int i = N / 2; i < N; ++i)
+	{
+		myfile << vetor[i * N + N / 2 - 1] << "\n";
 	}
 	myfile.close();
 	return;
@@ -67,7 +78,7 @@ void geometry(double * x, double * y, double * kx, double * ky, double * k2)
   }  
 }
 
-void potential_U(double * x, double * y, double * V)
+void potential_V(double * x, double * y, double * V)
 {
   #pragma omp parallel for
   for (int i = 0; i < N * N; i++)
@@ -78,7 +89,7 @@ void potential_U(double * x, double * y, double * V)
 
 void compute_omega(fftw_plan omega_to_omega, double * k2, double * S, double * omega)
 {
-  double c = dkx * dky * ( 1.0 / (2. * M_PI * 2.0 * M_PI * rho) ) * inv_N2;
+  double c = dkx * dky * ( 1.0 / (2. * M_PI * 2.0 * M_PI * rho) );
   #pragma omp parallel for 
   for (int i = 0; i < N * N; i++)
   {
@@ -87,13 +98,13 @@ void compute_omega(fftw_plan omega_to_omega, double * k2, double * S, double * o
   fftw_execute(omega_to_omega);
 }
 
-double compute_error(double * new_g, double * g)
+double compute_error(double * new_f, double * f)
 {
   double sum, tmp= 0;
   #pragma omp parallel for reduction(+ : sum) private(tmp)
   for (int i = 0; i < N * N; i++)
   {
-    tmp = abs(new_g[i] - g[i]); 
+    tmp = abs(new_f[i] - f[i]); 
     sum += tmp; 
   } 
   return sum * dx * dy / dt;
@@ -103,16 +114,16 @@ void laplace(double * g, double * Lg)
 {
   double inv_hh = 1. / (dx * dx); 
   #pragma omp parallel for 
-  for (int i = 0; i < N / 2; i++)
+  for (int i = 0; i < N; i++)
   {
-    for (int j = 0; j < N / 2; j++)
+    for (int j = 0; j < N; j++)
     {
-      Lg[i * N + j] = g[i * N + j + 1] - g[i * N + j] + g[i * N + j - 1]; // del_del_x
-      Lg[i * N + j] += g[(i + 1) * N + j] - g[i * N + j] + g[(i - 1) * N + j]; // del_del_y
+      Lg[i * N + j] = g[i * N + j + 1] - 2. * g[i * N + j] + g[i * N + j - 1]; // del_del_y
+      Lg[i * N + j] += g[(i + 1) * N + j] - 2. * g[i * N + j] + g[(i - 1) * N + j]; // del_del_x
       Lg[i * N + j] *= inv_hh;
-      Lg[(N - 1 - i) * N + j] = Lg[i * N + j];
-      Lg[i * N + (N - 1 - j)] = Lg[i * N + j];
-      Lg[(N - 1 - i) * N + (N - 1 - j)] = Lg[i * N + j];
+      //Lg[i * N + N / 2 + j - 1] = Lg[i * N + j];
+      //Lg[(N / 2 + i - 1) * N + N / 2 + j - 1] = Lg[i * N + j];
+      //Lg[(N / 2 + i - 1) * N + j] = Lg[i * N + j];
     } 
   } 
 }
@@ -138,7 +149,7 @@ void compute_S(fftw_plan g_to_S, double * g, double * new_S)
   #pragma omp parallel for
   for (int i = 0; i < N * N; i++)
   {
-    new_S[i] = 1.0 + rho * new_S[i] * dkx * dky * inv_N2;
+    new_S[i] = 1.0 + rho * new_S[i] * dx * dy;
   }
   return;  
 }
@@ -149,7 +160,7 @@ void initialize_g_S(double * g, double * S)
   for (int i = 0; i < N * N; i++)
   {
     S[i] = 1.0;
-    g[i] = 1.10;
+    g[i] = 1.0;
   }
   return;  
 }
