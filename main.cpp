@@ -22,13 +22,17 @@ double dt;
 int main(void)
 {
   N = 1 << 8;
+  inv_N2 = 1. / ((double)(N * N));
+
   L = 30.;
+  
   double h = L / (double)N;
   dx = h;
   dy = h;
-  inv_N2 = 1. / ((double)(N * N));
-  dkx = 2. * M_PI / (h * (double)N); // dk = 2*pi/L
-  dky = 2. * M_PI / (h * (double)N);
+  
+  double dk = 2. * M_PI / (h * (double)N); // dk = 2*pi/L
+  dkx = dk;
+  dky = dk;
 
   U = 1;
   rho = 1;
@@ -59,7 +63,7 @@ int main(void)
   if(with_wisdom)
   {
     flags = FFTW_WISDOM_ONLY;
-    printf ("Importing wisdom \n");
+    printf ("Importing wisdom\n");
     char import_buffer[200];
     sprintf(import_buffer,"N%d_fftw3.wisdom", N);
     int numberwisdom = fftw_import_wisdom_from_filename(import_buffer);
