@@ -39,36 +39,41 @@ void geometry(double * x, double * y, double * kx, double * ky, double * k2)
   for (int i = 0; i < N; i++)
   {
     for (int j = 0; j < N; j++)
-    {
-      x[i * N + j] = (-L / 2) + (i - 1) * dx;
-      y[i * N + j] = (-L / 2) + (j - 1) * dy;
+    { 
+      // Option 1: [0, L - h] x [0, L - h]
+      x[i * N + j] = 0 + i * dx; 
+      y[i * N + j] = 0 + j * dy;
+      
+      // Option 2, the traditional one: [-L / 2, L / 2] x [-L / 2, L / 2]
+      //x[i * N + j] = (-L / 2) + (i - 1) * dx; 
+      //y[i * N + j] = (-L / 2) + (j - 1) * dy;
     }
   }
 
   #pragma omp parallel for
   for (int i = 0; i < N; i++)
   {
-    for (int j = 0; j < N / 2; j++)
+    for (int j = 0; j < N; j++)
     {
-      kx[i * N + j] = i * 2 * M_PI / L;
+      kx[i * N + j] = i * 2.0 * M_PI / (2. * L);
     }    
-    for (int j = N / 2; j < N; j++)
-    {
-      kx[i * N + j] = (i - N) * 2 * M_PI / L;
-    }
+    //for (int j = N / 2; j < N; j++)
+    //{
+    //  kx[i * N + j] = (i - N) * 2 * M_PI / L;
+    //}
   }
   
   #pragma omp parallel for
   for (int j = 0; j < N; j++)
   {    
-    for (int i = 0; i < N / 2; i++)
+    for (int i = 0; i < N; i++)
     {
-      ky[i * N + j] = j * 2.0 * M_PI / L;
+      ky[i * N + j] = j * 2.0 * M_PI / (2. * L);
     }    
-    for (int i = N / 2; i < N; i++)
-    {
-      ky[i * N + j] = (j - N) * 2.0 * M_PI / L;
-    }
+    //for (int i = N / 2; i < N; i++)
+    //{
+    //  ky[i * N + j] = (j - N) * 2.0 * M_PI / L;
+    //}
   }
 
   #pragma omp parallel for
@@ -89,37 +94,25 @@ void potential_V(double * x, double * y, double * V)
 
 void compute_omega(fftw_plan omega_to_omega, double * k2, double * S, double * omega)
 {
-  double c = dkx * dky * ( 1.0 / (2. * M_PI * 2.0 * M_PI * rho) );
+  double c = dkx * dky * ( 1.0 / (2. * M_PI * 2.0 * M_PI * rho) ) * 0.25;
   #pragma omp parallel for 
   for (int i = 0; i < N * N; i++)
   {
-    omega[i] = - c * 0.25 * k2[i] * ( 2. * S[i] + 1. ) * ( 1. - (1. / S[i]) ) * ( 1. - (1. / S[i]) ); 
+    omega[i] = - c * k2[i] * ( 2. * S[i] + 1. ) * ( 1. - (1. / S[i]) ) * ( 1. - (1. / S[i]) ); 
   }  
   fftw_execute(omega_to_omega);
 }
 
-double compute_error(double * new_f, double * f)
-{
-  double sum, tmp= 0;
-  #pragma omp parallel for reduction(+ : sum) private(tmp)
-  for (int i = 0; i < N * N; i++)
-  {
-    tmp = abs(new_f[i] - f[i]); 
-    sum += tmp; 
-  } 
-  return sum * dx * dy / dt;
-}
-
-void laplace(double * g, double * Lg)
+void laplace_finite_difference(double * g, double * Lg)
 {
   double inv_hh = 1. / (dx * dx); 
   #pragma omp parallel for 
-  for (int i = 0; i < N; i++)
+  for (int i = 0; i < N - 2; i++)
   {
-    for (int j = 0; j < N; j++)
+    for (int j = 0; j < N - 2; j++)
     {
-      Lg[i * N + j] = g[i * N + j + 1] - 2. * g[i * N + j] + g[i * N + j - 1]; // del_del_y
-      Lg[i * N + j] += g[(i + 1) * N + j] - 2. * g[i * N + j] + g[(i - 1) * N + j]; // del_del_x
+      Lg[i * N + j] = g[i * N + j + 2] - 2. * g[i * N + j + 1] + g[i * N + j]; // del_del_y
+      Lg[i * N + j] += g[(i + 2) * N + j] - 2. * g[(i + 1) * N + j] + g[(i) * N + j]; // del_del_x
       Lg[i * N + j] *= inv_hh;
       //Lg[i * N + N / 2 + j - 1] = Lg[i * N + j];
       //Lg[(N / 2 + i - 1) * N + N / 2 + j - 1] = Lg[i * N + j];
@@ -143,13 +136,14 @@ void compute_S(fftw_plan g_to_S, double * g, double * new_S)
   #pragma omp parallel for
   for (int i = 0; i < N * N; i++)
   {
-    new_S[i] = g[i] * g[i] - 1.0; //Because g[] = sqrt{g[]}
+    new_S[i] = g[i] * g[i] - 1.0; //Because g[] is actually being  sqrt{g} here
   }
   fftw_execute(g_to_S); //Actually it is a FFTW_REDFT00 made inplace with new_S -> new_S
+  double c = rho * dx * dy;
   #pragma omp parallel for
   for (int i = 0; i < N * N; i++)
   {
-    new_S[i] = 1.0 + rho * new_S[i] * dx * dy;
+    new_S[i] = 1.0 + c * new_S[i];
   }
   return;  
 }
@@ -165,5 +159,28 @@ void initialize_g_S(double * g, double * S)
   return;  
 }
 
+double compute_g_error(double * new_g, double * g)
+{
+  double sum, tmp= 0;
+  #pragma omp parallel for reduction(+ : sum) private(tmp)
+  for (int i = 0; i < N * N; i++)
+  {
+    tmp = abs(new_g[i] - g[i]); 
+    sum += tmp; 
+  } 
+  return sum * dx * dy / dt;
+}
+
+double compute_S_error(double * new_S, double * S)
+{
+  double sum, tmp= 0;
+  #pragma omp parallel for reduction(+ : sum) private(tmp)
+  for (int i = 0; i < N * N; i++)
+  {
+    tmp = abs(new_S[i] - S[i]); 
+    sum += tmp; 
+  } 
+  return sum * dkx * dky / dt;
+}
 
 #endif

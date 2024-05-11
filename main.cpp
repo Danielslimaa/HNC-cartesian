@@ -21,22 +21,22 @@ double dt;
 
 int main(void)
 {
-  N = 1 << 8;
+  N = 1 << 10;
   inv_N2 = 1. / ((double)(N * N));
 
-  L = 30.;
+  L = 16.;
   
-  double h = L / (double)N;
+  double h = 2. * L / (double)(2 * (N - 1));
   dx = h;
   dy = h;
   
-  double dk = 2. * M_PI / (h * (double)N); // dk = 2*pi/L
+  double dk = 2. * M_PI / (2. * L); // dk = 2*pi/(2*L)
   dkx = dk;
   dky = dk;
 
   U = 1;
   rho = 1;
-  dt = 0.001;
+  dt = 0.00001;
   printf("N = %d, L = %1.0f, h = %1.6f, dk = %1.6f\n", N, L, h, dkx);
   printf("U = %1.2f, rho = %1.2f, dt = %1.4f\n", U, rho, dt);
   int max_threads = omp_get_max_threads();
@@ -59,7 +59,7 @@ int main(void)
   double * Lg = new double[N * N];
 
   unsigned flags;
-  bool with_wisdom = false;
+  bool with_wisdom = true;
   if(with_wisdom)
   {
     flags = FFTW_WISDOM_ONLY;
@@ -88,32 +88,13 @@ int main(void)
   initialize_g_S(g, S);
   geometry(x, y, kx, ky, k2);
   potential_V(x, y, V);  
-  printer_field(x, y, V, "V.dat");
-  printer_field_transversal_view(x, y, V, "Vtransversal.dat");
-  printer_field_transversal_view(x, y, S, "Stransversal.dat");
-  printer_field_transversal_view(x, y, g, "gtransversal.dat");
-  
-  #pragma omp parallel for
-  for (int i = 0; i < N; i++)
-  {
-    for (int j = 0; j < N; j++)
-    {
-      //new_S[i * N + j] = dkx * dky * V[i * N + j];// * pow(-1, i + j);
-    }
-  }
-
-  //laplace(V, Lg);
-  //fftw_execute(g_to_S);
-  //fftw_execute(g_to_S);
-  //printer_field(x, y, new_S, "teste.dat");
-
-  
+ 
   bool condition = true; 
   double error = 1.;
   long int counter = 1;
   while(condition)
   {
-    laplace(g, Lg);
+    laplace_finite_difference(g, Lg);
     compute_omega(omega_to_omega, k2, S, omega);
     update_g(Lg, V, omega, g);
     compute_S(g_to_S, g, new_S);
@@ -124,13 +105,16 @@ int main(void)
       if(counter > 1)
       {
         condition = (error > 1e-10);
+        printer_field_transversal_view(x, y, V, "Vtransversal.dat");
+        printer_field_transversal_view(x, y, S, "Stransversal.dat");
+        printer_field_transversal_view(x, y, g, "gtransversal.dat");
       }
     }
     memcpy(S, new_S, N * N * sizeof(double));
     counter += 1;
   }
-  printer_field_transversal_view(x, y, S, "Stransversal.dat");
-  printer_field_transversal_view(x, y, g, "gtransversal.dat");
+  
+
 
   printer_field(x, y, g, "g.dat");
   printer_field(x, y, S, "S.dat");
