@@ -25,9 +25,9 @@ void printer_field_transversal_view(double * x, double * y, double *vetor, const
 {
 	std::ofstream myfile;
 	myfile.open(name);
-	for (int i = N / 2; i < N; ++i)
+	for (int i = 0; i < N; ++i)
 	{
-		myfile << vetor[i * N + N / 2 - 1] << "\n";
+		myfile << vetor[i * N + 0] << "\n";
 	}
 	myfile.close();
 	return;
@@ -94,11 +94,12 @@ void potential_V(double * x, double * y, double * V)
 
 void compute_omega(fftw_plan omega_to_omega, double * k2, double * S, double * omega)
 {
-  double c = dkx * dky * ( 1.0 / (2. * M_PI * 2.0 * M_PI * rho) ) * 0.25;
+  double c = - dkx * dky * ( 1.0 / (2. * M_PI * 2.0 * M_PI * rho) ) * 0.25;
   #pragma omp parallel for 
   for (int i = 0; i < N * N; i++)
   {
-    omega[i] = - c * k2[i] * ( 2. * S[i] + 1. ) * ( 1. - (1. / S[i]) ) * ( 1. - (1. / S[i]) ); 
+    double aux = ( 1. - (1. / S[i]) );
+    omega[i] = c * k2[i] * ( 2. * S[i] + 1. ) * aux * aux; 
   }  
   fftw_execute(omega_to_omega);
 }
@@ -121,7 +122,7 @@ void laplace_finite_difference(double * g, double * Lg)
   } 
 }
 
-void update_g(double * Lg, double * V, double * omega, double * g)
+void update_g2(double * Lg, double * V, double * omega, double * g)
 {
   #pragma omp parallel for
   for (int i = 0; i < N * N; i++)
@@ -131,19 +132,19 @@ void update_g(double * Lg, double * V, double * omega, double * g)
   return;
 }
 
-void compute_S(fftw_plan g_to_S, double * g, double * new_S)
+void compute_S(fftw_plan g_to_S, double * g, double * S)
 {
-  #pragma omp parallel for
-  for (int i = 0; i < N * N; i++)
-  {
-    new_S[i] = g[i] * g[i] - 1.0; //Because g[] is actually being  sqrt{g} here
-  }
-  fftw_execute(g_to_S); //Actually it is a FFTW_REDFT00 made inplace with new_S -> new_S
   double c = rho * dx * dy;
   #pragma omp parallel for
   for (int i = 0; i < N * N; i++)
   {
-    new_S[i] = 1.0 + c * new_S[i];
+    S[i] = g[i] * g[i] - 1.0; //Because g[] is actually being  sqrt{g} here
+  }
+  fftw_execute(g_to_S); //Actually it is a FFTW_REDFT00 made inplace with S -> S
+  #pragma omp parallel for
+  for (int i = 0; i < N * N; i++)
+  {
+    S[i] = 1.0 + c * S[i];
   }
   return;  
 }
@@ -181,6 +182,72 @@ double compute_S_error(double * new_S, double * S)
     sum += tmp; 
   } 
   return sum * dkx * dky / dt;
+}
+
+void print_loop(double * x, double * y, double * g, double * S, double * new_S, long int counter, bool condition)
+{
+  if(counter%100 == 0 or counter == 1)
+  {
+    double error = compute_S_error(new_S, S);
+    printf("\rt = %ld, error = %1.4e", counter, error);
+    if(counter > 1)
+    {
+      condition = (error > 1e-6);
+      printer_field_transversal_view(x, y, S, "S.dat");
+      printer_field_transversal_view(x, y, g, "g.dat");
+      printer_field(x, y, g, "g.dat");
+      printer_field(x, y, S, "S.dat");
+    }
+    memcpy(new_S, S, N * N * sizeof(double));
+  }
+}
+
+void compute_Vph(double * V, double * g, double * omega, double * Vph)
+{
+  #pragma omp parallel for 
+  for (int i = 0; i < N - 4; i++)
+  {
+    for (int j = 0; j < N - 4; j++)
+    {
+      Vph[i * N + j] = g[i * N + j] * V[i * N + j];
+      double dely_g = 2. * g[i * N + j + 3] - 9. * g[i * N + j + 2] + 18. * g[i * N + j + 1] - 11. * g[i * N + j];
+      double delx_g = 2. * g[(i + 3) * N + j] - 9. * g[(i + 2) * N + j] + 18. * g[(i + 1) * N + j] - 11. * g[i * N + j];
+      Vph[i * N + j] += (delx_g * delx_g + dely_g * dely_g) / (6. * dx * 6. * dx * 4. * g[i * N + j]);
+      Vph[i * N + j] += (  g[i * N + j] - 1.  ) * omega[i * N + j];
+    } 
+  }   
+  return;
+}
+
+void update_S(fftw_plan Vph_to_Vph, double * k2, double * Vph, double * S)
+{
+  double c = rho * dx * dy;
+  fftw_execute(Vph_to_Vph);
+  #pragma omp parallel for 
+  for (int i = 0; i < N * N; i++)
+  {
+    Vph[i] *= c;
+    double dS = sqrt( k2[i] / ( k2[i] + 4. * Vph[i] ) );
+    S[i] = (1. - dt) * S[i] + dt * dS; 
+  } 
+  return;
+}
+
+void compute_g(fftw_plan S_to_g, double * S, double * g)
+{
+  double c = dkx * dky / (2. * M_PI * 2. * M_PI * rho);
+  #pragma omp parallel for 
+  for (int i = 0; i < N * N; i++)
+  {
+    g[i] = S[i] - 1.; 
+  }
+  fftw_execute(S_to_g);
+  #pragma omp parallel for 
+  for (int i = 0; i < N * N; i++)
+  {
+    g[i] = 1. + c * g[i];
+  } 
+  return;
 }
 
 #endif
