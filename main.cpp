@@ -23,7 +23,7 @@ int main(void)
 {
   void fftw_cleanup_threads(void);
   fftw_cleanup();
-  N = 1 << 8;
+  N = 1 << 10;
   inv_N2 = 1. / ((double)(N * N));
 
   L = 5.;
@@ -78,7 +78,6 @@ int main(void)
     printf("Setting FFT plans.\n");
   }
 
-  fftw_plan g_to_S =  fftw_plan_r2r_2d(N, N, S, S, FFTW_REDFT00, FFTW_REDFT00, flags);
   fftw_plan omega_to_omega =  fftw_plan_r2r_2d(N, N, omega, omega, FFTW_REDFT00, FFTW_REDFT00, flags);
   fftw_plan Vph_to_Vph =  fftw_plan_r2r_2d(N, N, Vph, Vph, FFTW_REDFT00, FFTW_REDFT00, flags);
   fftw_plan S_to_g =  fftw_plan_r2r_2d(N, N, g, g, FFTW_REDFT00, FFTW_REDFT00, flags);
@@ -104,12 +103,12 @@ int main(void)
     compute_Vph(V, g, omega, Vph);
     update_S(Vph_to_Vph, k2, Vph, S);
     compute_g(S_to_g, S, g);
-    print_loop(x, y, g, S, new_S, counter, condition);    
+    print_loop(x, y, k2, g, V, S, new_S, counter, condition);    
     counter += 1;
   }
-  
-  printer_field(x, y, g, "g.dat");
-  printer_field(x, y, S, "S.dat");
+  printf("\n");
+  printer_field(x, y, g, "g_full.dat");
+  printer_field(x, y, S, "S_full.dat");
   void fftw_cleanup_threads(void);
   fftw_cleanup();
   delete[] x;

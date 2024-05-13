@@ -104,51 +104,6 @@ void compute_omega(fftw_plan omega_to_omega, double * k2, double * S, double * o
   fftw_execute(omega_to_omega);
 }
 
-void laplace_finite_difference(double * g, double * Lg)
-{
-  double inv_hh = 1. / (dx * dx); 
-  #pragma omp parallel for 
-  for (int i = 0; i < N - 2; i++)
-  {
-    for (int j = 0; j < N - 2; j++)
-    {
-      Lg[i * N + j] = g[i * N + j + 2] - 2. * g[i * N + j + 1] + g[i * N + j]; // del_del_y
-      Lg[i * N + j] += g[(i + 2) * N + j] - 2. * g[(i + 1) * N + j] + g[(i) * N + j]; // del_del_x
-      Lg[i * N + j] *= inv_hh;
-      //Lg[i * N + N / 2 + j - 1] = Lg[i * N + j];
-      //Lg[(N / 2 + i - 1) * N + N / 2 + j - 1] = Lg[i * N + j];
-      //Lg[(N / 2 + i - 1) * N + j] = Lg[i * N + j];
-    } 
-  } 
-}
-
-void update_g2(double * Lg, double * V, double * omega, double * g)
-{
-  #pragma omp parallel for
-  for (int i = 0; i < N * N; i++)
-  {
-    g[i] = (1. - dt) * g[i] + dt * (-Lg[i] + V[i] * g[i] + omega[i] * g[i]); //Eq.(7) 
-  }
-  return;
-}
-
-void compute_S(fftw_plan g_to_S, double * g, double * S)
-{
-  double c = rho * dx * dy;
-  #pragma omp parallel for
-  for (int i = 0; i < N * N; i++)
-  {
-    S[i] = g[i] * g[i] - 1.0; //Because g[] is actually being  sqrt{g} here
-  }
-  fftw_execute(g_to_S); //Actually it is a FFTW_REDFT00 made inplace with S -> S
-  #pragma omp parallel for
-  for (int i = 0; i < N * N; i++)
-  {
-    S[i] = 1.0 + c * S[i];
-  }
-  return;  
-}
-
 void initialize_g_S(double * g, double * S)
 {
   #pragma omp parallel for
@@ -182,24 +137,6 @@ double compute_S_error(double * new_S, double * S)
     sum += tmp; 
   } 
   return sum * dkx * dky / dt;
-}
-
-void print_loop(double * x, double * y, double * g, double * S, double * new_S, long int counter, bool condition)
-{
-  if(counter%100 == 0 or counter == 1)
-  {
-    double error = compute_S_error(new_S, S);
-    printf("\rt = %ld, error = %1.4e", counter, error);
-    if(counter > 1)
-    {
-      condition = (error > 1e-6);
-      printer_field_transversal_view(x, y, S, "S.dat");
-      printer_field_transversal_view(x, y, g, "g.dat");
-      printer_field(x, y, g, "g.dat");
-      printer_field(x, y, S, "S.dat");
-    }
-    memcpy(new_S, S, N * N * sizeof(double));
-  }
 }
 
 void compute_Vph(double * V, double * g, double * omega, double * Vph)
@@ -248,6 +185,48 @@ void compute_g(fftw_plan S_to_g, double * S, double * g)
     g[i] = 1. + c * g[i];
   } 
   return;
+}
+
+double compute_energy(double * k2, double * g, double * S, double * V)
+{
+  double c1 = (rho / 2.) * dx * dy;
+  double c2 = - (1. / 8.) * ( 1. / (2. * M_PI * 2. * M_PI * rho) ) * dkx * dky;
+  double c3 = - (rho / 2.) * 0.25;
+  double sum, tmp= 0;
+  #pragma omp parallel for reduction(+ : sum) private(tmp)
+  for (int i = 0; i < N - 2; i++)
+  {
+    for (int j = 0; j < N - 2; j++)
+    {
+      double aux = S[i * N + j] - 1.;
+      tmp = c1 * V[i * N + j] * g[i * N + j];// + c2 * k2[i * N + j] * aux * aux * aux / S[i * N + j];
+      tmp += c3 * g[i * N + j] * ( log(g[i * N + j + 2]) - 2. * log(g[i * N + j + 1]) + log(g[i * N + j]) ); // delyy_g
+      tmp += c3 * g[i * N + j] * ( log(g[(i + 2) * N + j]) - 2. * log(g[(i + 1) * N + j]) + log(g[(i) * N + j]) ); // delxx_g
+
+      sum += tmp;
+    } 
+  } 
+  return sum;
+}
+
+void print_loop(double * x, double * y, double * k2, double * g, double * V, double * S, double * new_S, long int counter, bool condition)
+{
+  double energy, new_energy;
+  if(counter%200 == 0 or counter == 1)
+  {
+    new_energy = compute_energy(k2, g, new_S, V);
+    double error = abs(new_energy - energy) / dt;
+    printf("t = %ld, de/dt = %1.4e, e = %1.4e\n", counter, error, new_energy);
+    if(counter > 1)
+    {
+      printer_field_transversal_view(x, y, S, "S.dat");
+      printer_field_transversal_view(x, y, g, "g.dat");
+      //printer_field(x, y, g, "g.dat");
+      //printer_field(x, y, S, "S.dat");
+    }
+    memcpy(new_S, S, N * N * sizeof(double));
+    energy = new_energy;
+  }
 }
 
 #endif
