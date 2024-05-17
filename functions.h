@@ -1,15 +1,18 @@
 #ifndef FUNCTIONS
 #define FUNCTIONS
 
-extern long int N;
-extern double inv_N2;
-extern double L;
-extern double dx, dy, dkx, dky;
-extern double U;
-extern double rho;
-extern double dt;
+long int N;
+double inv_N2;
+double L; 
+double dx, dy, dkx, dky;
+double U;
+double rho;
+double dt;
+double energy, new_energy;
+bool condition;
+double tolerance;
 
-void printer_field(double * x, double * y, double *vetor, const char *name)
+void printer_field(double * x, double * y, double *vetor, const char * name)
 {
 	std::ofstream myfile;
 	myfile.open(name);
@@ -21,7 +24,7 @@ void printer_field(double * x, double * y, double *vetor, const char *name)
 	return;
 }
 
-void printer_field_transversal_view(double * x, double * y, double *vetor, const char *name)
+void printer_field_transversal_view(double * x, double * y, double *vetor, const char * name)
 {
 	std::ofstream myfile;
 	myfile.open(name);
@@ -31,6 +34,16 @@ void printer_field_transversal_view(double * x, double * y, double *vetor, const
 	}
 	myfile.close();
 	return;
+}
+
+printer_field_only(double *vetor, const char *name)
+{
+	std::ofstream myfile(name);
+	for (int i = 0; i < N * N; ++i)
+	{
+		myfile << vetor[i] << "\n";
+	}
+	myfile.close();
 }
 
 void geometry(double * x, double * y, double * kx, double * ky, double * k2)
@@ -209,14 +222,14 @@ double compute_energy(double * k2, double * g, double * S, double * V)
   return sum;
 }
 
-void print_loop(double * x, double * y, double * k2, double * g, double * V, double * S, double * new_S, long int counter, bool condition)
+void print_loop(double * x, double * y, double * k2, double * g, double * V, double * S, double * new_S, long int counter)
 {
-  double energy, new_energy;
   if(counter%200 == 0 or counter == 1)
   {
     new_energy = compute_energy(k2, g, new_S, V);
     double error = abs(new_energy - energy) / dt;
-    printf("t = %ld, de/dt = %1.4e, e = %1.4e\n", counter, error, new_energy);
+    bool aux_condition = error > tolerance;
+    printf("t = %ld, de/dt = %1.4e, e = %1.6f\n", counter, error, new_energy);
     if(counter > 1)
     {
       printer_field_transversal_view(x, y, S, "S.dat");
@@ -226,7 +239,24 @@ void print_loop(double * x, double * y, double * k2, double * g, double * V, dou
     }
     memcpy(new_S, S, N * N * sizeof(double));
     energy = new_energy;
+    condition = aux_condition;
   }
 }
 
+void read_field(double * vetor, const char * name)
+{
+	std::ifstream myfile(name);
+  // Check if the file is open
+  if (!myfile.is_open()) {
+      std::cerr << "Error: Could not open the file." << std::endl;
+  }
+  else
+  {
+    for (int i = 0; i < N * N; ++i)
+    {
+      myfile >> vetor[i];
+    }
+  }
+	myfile.close();
+}
 #endif

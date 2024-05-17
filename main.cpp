@@ -10,20 +10,13 @@
 #include <fftw3.h>
 #include "functions.h"
 
-long int N;
-double inv_N2;
-double L; 
-double dx, dy, dkx, dky;
-double U;
-double rho;
-double dt;
 //g++ main.cpp -w -lfftw3_omp -lfftw3 -fopenmp -lm -O3
 
 int main(void)
 {
   void fftw_cleanup_threads(void);
   fftw_cleanup();
-  N = 1 << 10;
+  N = 1 << 8;
   inv_N2 = 1. / ((double)(N * N));
 
   L = 5.;
@@ -41,7 +34,7 @@ int main(void)
   dt = 0.001;
   printf("N = %d, L = %1.0f, h = %1.6f, dk = %1.6f\n", N, L, h, dkx);
   printf("U = %1.2f, rho = %1.2f, dt = %1.4f\n", U, rho, dt);
-  int max_threads = omp_get_max_threads() / 2; // 16 cores 
+  int max_threads = 8;//omp_get_max_threads() / 2; // 16 cores 
   printf("Maximum number of threads = %d\n", max_threads);
   omp_set_num_threads(max_threads);
 
@@ -94,21 +87,23 @@ int main(void)
   geometry(x, y, kx, ky, k2);
   potential_V(x, y, V);  
  
-  bool condition = true; 
-  double error = 1.;
+  condition = true; 
+  tolerance = 1e-6;
   long int counter = 1;
-  while(counter < 30000)
+  while(condition)
   {
     compute_omega(omega_to_omega, k2, S, omega);
     compute_Vph(V, g, omega, Vph);
     update_S(Vph_to_Vph, k2, Vph, S);
     compute_g(S_to_g, S, g);
-    print_loop(x, y, k2, g, V, S, new_S, counter, condition);    
+    print_loop(x, y, k2, g, V, S, new_S, counter);    
     counter += 1;
   }
-  printf("\n");
+  printf("\nThe computation has ended. Printing the fields.");
   printer_field(x, y, g, "g_full.dat");
   printer_field(x, y, S, "S_full.dat");
+  printer_field_only(g, "g_field_only.dat");
+  printer_field_only(S, "S_field_only.dat");
   void fftw_cleanup_threads(void);
   fftw_cleanup();
   delete[] x;
