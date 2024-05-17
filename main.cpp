@@ -1,13 +1,3 @@
-#include <iostream>
-#include <math.h>
-#include <cmath>
-#include <ctime>
-#include <fstream>
-#include <stdio.h>
-#include <cstdlib>
-#include <cstring>
-#include <omp.h>
-#include <fftw3.h>
 #include "functions.h"
 
 //g++ main.cpp -w -lfftw3_omp -lfftw3 -fopenmp -lm -O3
@@ -73,7 +63,7 @@ int main(void)
 
   fftw_plan omega_to_omega =  fftw_plan_r2r_2d(N, N, omega, omega, FFTW_REDFT00, FFTW_REDFT00, flags);
   fftw_plan Vph_to_Vph =  fftw_plan_r2r_2d(N, N, Vph, Vph, FFTW_REDFT00, FFTW_REDFT00, flags);
-  fftw_plan S_to_g =  fftw_plan_r2r_2d(N, N, g, g, FFTW_REDFT00, FFTW_REDFT00, flags);
+  fftw_plan g_to_g =  fftw_plan_r2r_2d(N, N, g, g, FFTW_REDFT00, FFTW_REDFT00, flags);
 
   if (!with_wisdom)
   {
@@ -95,15 +85,14 @@ int main(void)
     compute_omega(omega_to_omega, k2, S, omega);
     compute_Vph(V, g, omega, Vph);
     update_S(Vph_to_Vph, k2, Vph, S);
-    compute_g(S_to_g, S, g);
+    compute_g(g_to_g, S, g);
     print_loop(x, y, k2, g, V, S, new_S, counter);    
     counter += 1;
   }
   printf("\nThe computation has ended. Printing the fields.");
   printer_field(x, y, g, "g_full.dat");
   printer_field(x, y, S, "S_full.dat");
-  printer_field_only(g, "g_field_only.dat");
-  printer_field_only(S, "S_field_only.dat");
+  
   void fftw_cleanup_threads(void);
   fftw_cleanup();
   delete[] x;

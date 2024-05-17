@@ -1,5 +1,15 @@
 #ifndef FUNCTIONS
 #define FUNCTIONS
+#include <iostream>
+#include <math.h>
+#include <cmath>
+#include <ctime>
+#include <fstream>
+#include <stdio.h>
+#include <cstdlib>
+#include <cstring>
+#include <omp.h>
+#include <fftw3.h>
 
 long int N;
 double inv_N2;
@@ -11,14 +21,14 @@ double dt;
 double energy, new_energy;
 bool condition;
 double tolerance;
+double lambda, new_lambda;
 
 void printer_field(double * x, double * y, double *vetor, const char * name)
 {
-	std::ofstream myfile;
-	myfile.open(name);
+	std::ofstream myfile(name);
 	for (int i = 0; i < N * N; ++i)
 	{
-		myfile << x[i] << " " << y[i] << " " << vetor[i] << "\n";
+		myfile << x[i] << '\t' << y[i] << '\t' << vetor[i] << '\n';
 	}
 	myfile.close();
 	return;
@@ -34,16 +44,6 @@ void printer_field_transversal_view(double * x, double * y, double *vetor, const
 	}
 	myfile.close();
 	return;
-}
-
-printer_field_only(double *vetor, const char *name)
-{
-	std::ofstream myfile(name);
-	for (int i = 0; i < N * N; ++i)
-	{
-		myfile << vetor[i] << "\n";
-	}
-	myfile.close();
 }
 
 void geometry(double * x, double * y, double * kx, double * ky, double * k2)
@@ -183,7 +183,7 @@ void update_S(fftw_plan Vph_to_Vph, double * k2, double * Vph, double * S)
   return;
 }
 
-void compute_g(fftw_plan S_to_g, double * S, double * g)
+void compute_g(fftw_plan g_to_g, double * S, double * g)
 {
   double c = dkx * dky / (2. * M_PI * 2. * M_PI * rho);
   #pragma omp parallel for 
@@ -191,7 +191,7 @@ void compute_g(fftw_plan S_to_g, double * S, double * g)
   {
     g[i] = S[i] - 1.; 
   }
-  fftw_execute(S_to_g);
+  fftw_execute(g_to_g);
   #pragma omp parallel for 
   for (int i = 0; i < N * N; i++)
   {
@@ -205,7 +205,7 @@ double compute_energy(double * k2, double * g, double * S, double * V)
   double c1 = (rho / 2.) * dx * dy;
   double c2 = - (1. / 8.) * ( 1. / (2. * M_PI * 2. * M_PI * rho) ) * dkx * dky;
   double c3 = - (rho / 2.) * 0.25;
-  double sum, tmp= 0;
+  double sum, tmp = 0;
   #pragma omp parallel for reduction(+ : sum) private(tmp)
   for (int i = 0; i < N - 2; i++)
   {
@@ -221,6 +221,129 @@ double compute_energy(double * k2, double * g, double * S, double * V)
   } 
   return sum;
 }
+
+void compute_utils(double * pre_W, double * exp_k2, double * g, double * fft_sqrt_g, fftw_plan * pre_W_to_pre_W, fftw_plan * g_to_sqrt_g)
+{
+  #pragma omp parallel for
+  for (int i = 0; i < N * N; i++)
+  {
+    exp_k2[i] = inv_N2 * exp(k2[i] * (dt / 2.));
+  }
+  double c1 = dx * dy;
+  double c2 = dkx * dky / (2. * M_PI * 2. * M_PI);
+  #pragma for omp parallel for
+  for(int i = 0; i < N * N; i++)
+  {
+    double aux = 1.0 - (1.0 / S[i]);
+    pre_W[i] = -c2 * k2[i] * aux * aux * aux;
+  }
+  fftw_execute(pre_W_to_pre_W);
+  #pragma for omp parallel for
+  for(int i = 0; i < N * N; i++)
+  {
+    g[i] = c1 * sqrt(g[i]);
+  }
+  fftw_execute(g_to_sqrt_g);
+}
+
+void compute_W_part(double * k2, double * S, double * g, double * fft_sqrt_g, double * pre_W, double * W, double * f, fftw_plan W_to_W, fftw_plan g_to_sqrt_g)
+{
+  double c1 = dx * dy;
+  double c2 = dkx * dky / (2. * M_PI * 2. * M_PI);
+ 
+  #pragma for omp parallel for
+  for(int i = 0; i < N * N; i++)
+  {
+    W[i] = c1 * pre_W[i] * g[i] * f[i];
+  }
+  fftw_execute(W_to_W);
+  #pragma for omp parallel for
+  for(int i = 0; i < N * N; i++)
+  {
+    W[i] = c2 * fft_sqrt_g[i] * W[i];
+  }  
+  fftw_execute(W_to_W);
+}
+
+void compute_kinetic(double * exp_k2, double * f, double * f_to_f)
+{
+  fftw_execute(f_to_f);
+  #pragma omp parallel for
+  for(int i = 0; i < N * N; i+)
+  {
+    f *= exp_k2[i];
+  }
+  fftw_execute(f_to_f);
+}
+
+void normalize_f(double * f)
+{
+  double sum, tmp = 0;
+  #pragma omp parallel for reduction(+ : sum) private(tmp)
+  for(int i = 0; i < N * N; i++)
+  {
+    tmp = f[i] * f[i];
+    sum += tmp;
+  }
+  sum *= dx * dy;
+  sum = sqrt(sum);
+  #pragma omp parallel for
+  for(int i = 0; i < N * N; i++)
+  {
+    f /= sum;
+  }
+}
+
+void printer_loop_f(long int counter, double * k2, double * g, double * f, double * V, double * omega, double * pre_W, fftw_plan W_to_W, fftw_plan f_to_f)
+{
+
+  if(counter % 200 == 0)
+  {
+    double * Lf = new double[N * N];
+    #pragma omp parallel for
+    for(int i = 0; i < N * N; i++)
+    {
+      Lf[i] = (V[i] + omega[i] + W[i]) * f[i];
+    }
+    fftw_execute(f_to_f);
+    #pragma omp parallel for
+    for(int i = 0; i < N * N; i++)
+    {
+      f[i] *= k2[i] * inv_N2;
+    }
+    fftw_execute(f_to_f);
+    #pragma omp parallel for
+    for(int i = 0; i < N * N; i++)
+    {
+      Lf[i] += -f[i];
+    }  
+    double sum, tmp = 0;
+    #pragma omp parallel for reduction(+ : sum) private(tmp)
+    for(int i = 0; i < N * N; i++)
+    {
+      tmp = f[i] * Lf[i];
+      sum += tmp;
+    }   
+    double fLf = sum * dx * dy;
+    sum = 0;
+    tmp = 0;
+    #pragma omp parallel for reduction(+ : sum) private(tmp)
+    for(int i = 0; i < N * N; i++)
+    {
+      tmp = f[i] * f[i];
+      sum += tmp;
+    }
+    double ff = sum * dx * dy;
+    new_lambda = fLf / ff;
+    error = (new_lambda - lambda) / dt;
+    printf("counter = %ld, lambda = %1.4f, error = %1.6e\n", counter, new_lambda, error);
+    new_lambda = lambda;
+    condition = error > tolerance;
+  }
+
+  delete[] Lf;
+}
+
 
 void print_loop(double * x, double * y, double * k2, double * g, double * V, double * S, double * new_S, long int counter)
 {
@@ -243,7 +366,7 @@ void print_loop(double * x, double * y, double * k2, double * g, double * V, dou
   }
 }
 
-void read_field(double * vetor, const char * name)
+void read_field(double * x, double *y, double * vetor, const char * name)
 {
 	std::ifstream myfile(name);
   // Check if the file is open
@@ -254,9 +377,11 @@ void read_field(double * vetor, const char * name)
   {
     for (int i = 0; i < N * N; ++i)
     {
-      myfile >> vetor[i];
+      myfile >> x[i] >> y[i] >> vetor[i];
+      myfile.ignore(1, '\t');
     }
   }
 	myfile.close();
 }
+
 #endif
