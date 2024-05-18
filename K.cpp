@@ -77,8 +77,9 @@ int main(void){
   fftw_plan omega_to_omega =  fftw_plan_r2r_2d(N, N, omega, omega, FFTW_REDFT00, FFTW_REDFT00, flags);
   fftw_plan S_to_g =  fftw_plan_r2r_2d(N, N, g, g, FFTW_REDFT00, FFTW_REDFT00, flags);
   fftw_plan W_to_W =  fftw_plan_r2r_2d(N, N, W, W, FFTW_REDFT00, FFTW_REDFT00, flags);
+  fftw_plan pre_W_to_pre_W =  fftw_plan_r2r_2d(N, N, pre_W, pre_W, FFTW_REDFT00, FFTW_REDFT00, flags);
   fftw_plan f_to_f =  fftw_plan_r2r_2d(N, N, f, f, FFTW_REDFT00, FFTW_REDFT00, flags);
-  fftw_plan g_to_sqrt_g =  fftw_plan_r2r_2d(N, N, g, fft_sqrt_g, FFTW_REDFT00, FFTW_REDFT00, flags);
+  fftw_plan sqrt_g_to_sqrt_g =  fftw_plan_r2r_2d(N, N, g, fft_sqrt_g, FFTW_REDFT00, FFTW_REDFT00, flags);
 
   if (!with_wisdom)
   {
@@ -89,18 +90,18 @@ int main(void){
 
   geometry(x, y, kx, ky, k2);
   potential_V(x, y, V);
-  read_file(x, y, g, "g_full.dat");
-  read_file(x, y, S, "S_full.dat");
+  read_field(x, y, g, "g_full.dat");
+  read_field(x, y, S, "S_full.dat");
   compute_omega(omega_to_omega, k2, S, omega);
-  compute_utils(pre_W, exp_k2, g, fft_sqrt_g, pre_W_to_pre_W, g_to_sqrt_g);
-
+  compute_utils(k2, S, pre_W, exp_k2, f, g, fft_sqrt_g, pre_W_to_pre_W, sqrt_g_to_sqrt_g);
+  
   condition = true; 
   tolerance = 1e-6;
   long int counter = 1;
   while(condition)
   {
     compute_kinetic(exp_k2, f, f_to_f);
-    compute_W_part(k2, S, g, fft_sqrt_g, pre_W, W, f, W_to_W);  
+    compute_W_part(k2, S, g, fft_sqrt_g, pre_W, W, f, W_to_W, sqrt_g_to_sqrt_g);  
     #pragma omp parallel for
     for (int i = 0; i < N * N; i++)
     {
@@ -112,8 +113,8 @@ int main(void){
 
     counter += 1;
   }
-  printf("\nThe computation has ended. Printing the fields.");
-  printer_field(x, y, g, "g_full.dat");
+  printf("\nThe computation has ended. Printing the fields.\n");
+  printer_field(x, y, f, "f_full.dat");
 
   void fftw_cleanup_threads(void);
   fftw_cleanup();

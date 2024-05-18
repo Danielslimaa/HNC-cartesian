@@ -222,8 +222,9 @@ double compute_energy(double * k2, double * g, double * S, double * V)
   return sum;
 }
 
-void compute_utils(double * pre_W, double * exp_k2, double * g, double * fft_sqrt_g, fftw_plan * pre_W_to_pre_W, fftw_plan * g_to_sqrt_g)
+void compute_utils(double * k2, double * S, double * pre_W, double * exp_k2, double * f, double * g, double * fft_sqrt_g, fftw_plan pre_W_to_pre_W, fftw_plan sqrt_g_to_sqrt_g)
 {
+  lambda = 0;
   #pragma omp parallel for
   for (int i = 0; i < N * N; i++)
   {
@@ -241,9 +242,15 @@ void compute_utils(double * pre_W, double * exp_k2, double * g, double * fft_sqr
   #pragma for omp parallel for
   for(int i = 0; i < N * N; i++)
   {
-    g[i] = c1 * sqrt(g[i]);
+    g[i] = sqrt(g[i]);
+    f[i] = sqrt(g[i]);
   }
-  fftw_execute(g_to_sqrt_g);
+  fftw_execute(sqrt_g_to_sqrt_g);
+  #pragma for omp parallel for
+  for(int i = 0; i < N * N; i++)
+  {
+    fft_sqrt_g[i] *= c1;
+  }
 }
 
 void compute_W_part(double * k2, double * S, double * g, double * fft_sqrt_g, double * pre_W, double * W, double * f, fftw_plan W_to_W, fftw_plan g_to_sqrt_g)
@@ -265,13 +272,13 @@ void compute_W_part(double * k2, double * S, double * g, double * fft_sqrt_g, do
   fftw_execute(W_to_W);
 }
 
-void compute_kinetic(double * exp_k2, double * f, double * f_to_f)
+void compute_kinetic(double * exp_k2, double * f, fftw_plan f_to_f)
 {
   fftw_execute(f_to_f);
   #pragma omp parallel for
-  for(int i = 0; i < N * N; i+)
+  for(int i = 0; i < N * N; i++)
   {
-    f *= exp_k2[i];
+    f[i] *= exp_k2[i];
   }
   fftw_execute(f_to_f);
 }
@@ -290,15 +297,23 @@ void normalize_f(double * f)
   #pragma omp parallel for
   for(int i = 0; i < N * N; i++)
   {
-    f /= sum;
+    f[i] /= sum;
   }
 }
 
-void printer_loop_f(long int counter, double * k2, double * g, double * f, double * V, double * omega, double * pre_W, fftw_plan W_to_W, fftw_plan f_to_f)
+void printer_loop_f(long int counter, double * k2, double * g, double * f, double * V, double * omega, double * W, fftw_plan W_to_W, fftw_plan f_to_f)
 {
 
-  if(counter % 200 == 0)
+  if(counter%1 == 0)
   {
+    double sum, tmp = 0;
+    #pragma omp parallel for reduction(+ : sum) private(tmp)
+    for(int i = 0; i < N * N; i++)
+    {
+      tmp = f[i];
+      sum += tmp;
+    }
+    double ff = sum * dx * dy;
     double * Lf = new double[N * N];
     #pragma omp parallel for
     for(int i = 0; i < N * N; i++)
@@ -317,31 +332,22 @@ void printer_loop_f(long int counter, double * k2, double * g, double * f, doubl
     {
       Lf[i] += -f[i];
     }  
-    double sum, tmp = 0;
-    #pragma omp parallel for reduction(+ : sum) private(tmp)
-    for(int i = 0; i < N * N; i++)
-    {
-      tmp = f[i] * Lf[i];
-      sum += tmp;
-    }   
-    double fLf = sum * dx * dy;
     sum = 0;
     tmp = 0;
     #pragma omp parallel for reduction(+ : sum) private(tmp)
     for(int i = 0; i < N * N; i++)
     {
-      tmp = f[i] * f[i];
+      tmp = Lf[i];
       sum += tmp;
-    }
-    double ff = sum * dx * dy;
+    }   
+    double fLf = sum * dx * dy;
     new_lambda = fLf / ff;
-    error = (new_lambda - lambda) / dt;
+    double error = abs(new_lambda - lambda) / dt;
     printf("counter = %ld, lambda = %1.4f, error = %1.6e\n", counter, new_lambda, error);
     new_lambda = lambda;
     condition = error > tolerance;
+    delete[] Lf;
   }
-
-  delete[] Lf;
 }
 
 
