@@ -29,12 +29,12 @@ int main(void){
   dkx = dk;
   dky = dk;
 
-  U = 10;
+  U = 20;
   rho = 1;
-  dt = 0.0001;
+  dt = 0.01;
   printf("N = %d, L = %1.0f, h = %1.6f, dk = %1.6f\n", N, L, h, dkx);
   printf("U = %1.2f, rho = %1.2f, dt = %1.4f\n", U, rho, dt);
-  int max_threads = 8;//omp_get_max_threads() / 2; // 16 cores 
+  int max_threads = 16;//omp_get_max_threads() / 2; // 16 cores 
   printf("Maximum number of threads = %d\n", max_threads);
   omp_set_num_threads(max_threads);
 
@@ -56,6 +56,31 @@ int main(void){
   double * pre_W = new double[N * N];
   double * W = new double[N * N];
   double * f = new double[N * N];
+  double * expAx = new double[N * N]; 
+  double * expAy = new double[N * N];
+
+  double p = dk;
+
+  //Operator in the x-direction
+  #pragma omp parallel for
+  for (int j = 0; j < N; j++)
+  {
+    for (int i = 0; i < N; i++)
+    {
+      double temp = (   pow(p * i, 2.0)  ) * dt / 2.0;
+      expAx[i * N + j] = exp(-temp) / (1.0 * N);
+    }    
+  }
+
+  //Operator in the y-direction
+  for (int i = 0; i < N; i++)
+  {    
+    for (int j = 0; j < N; j++)
+    {
+      double temp = (  pow(p * j, 2)  ) * dt / 2.0;
+      expAy[i * N + j] = exp(-temp) / (1.0 * N);
+    }    
+  }  
 
   unsigned flags;
   bool with_wisdom = true;
@@ -64,8 +89,8 @@ int main(void){
     flags = FFTW_WISDOM_ONLY;
     printf ("Importing wisdom\n");
     char import_buffer[200];
-    sprintf(import_buffer,"N%d_fftw3.wisdom", N);
-    int numberwisdom = fftw_import_wisdom_from_filename(import_buffer);
+    sprintf(import_buffer,"KN%d_fftw3.wisdom", N);
+    int numbrerwisdom = fftw_import_wisdom_from_filename(import_buffer);
   }
   else
   {
@@ -74,17 +99,22 @@ int main(void){
     printf("Setting FFT plans.\n");
   }
 
-  fftw_plan omega_to_omega =  fftw_plan_r2r_2d(N, N, omega, omega, FFTW_REDFT00, FFTW_REDFT00, flags);
-  fftw_plan S_to_g =  fftw_plan_r2r_2d(N, N, g, g, FFTW_REDFT00, FFTW_REDFT00, flags);
-  fftw_plan W_to_W =  fftw_plan_r2r_2d(N, N, W, W, FFTW_REDFT00, FFTW_REDFT00, flags);
-  fftw_plan pre_W_to_pre_W =  fftw_plan_r2r_2d(N, N, pre_W, pre_W, FFTW_REDFT00, FFTW_REDFT00, flags);
-  fftw_plan f_to_f =  fftw_plan_r2r_2d(N, N, f, f, FFTW_REDFT00, FFTW_REDFT00, flags);
-  fftw_plan sqrt_g_to_sqrt_g =  fftw_plan_r2r_2d(N, N, g, fft_sqrt_g, FFTW_REDFT00, FFTW_REDFT00, flags);
+  fftw_plan S_to_g = fftw_plan_r2r_2d(N, N, g, g, FFTW_REDFT00, FFTW_REDFT00, flags);
+  fftw_plan f_to_f = fftw_plan_r2r_2d(N, N, f, f, FFTW_REDFT00, FFTW_REDFT00, flags);
+  fftw_plan W_to_W = fftw_plan_r2r_2d(N, N, W, W, FFTW_REDFT00, FFTW_REDFT00, flags);
+  fftw_r2r_kind kinds[] = {FFTW_REDFT00, FFTW_REDFT00};
+  int howmany = N;
+  //1D FFT's in x-axis (columns)  
+  //fftw_plan_many_dft(rank, n, howmany, in, inembed, istride, idist, out, onembed, ostride, odist, -1, flags);
+  fftw_plan p_x = fftw_plan_many_r2r(1, &N, howmany, f, NULL, howmany, 1, f, NULL, howmany, 1, kinds, flags);
+
+  //1D FFT's in y-axis (rows)
+  fftw_plan p_y = fftw_plan_many_r2r(1, &N, howmany, f, NULL, 1, howmany, f, NULL, 1, howmany, kinds, flags);
 
   if (!with_wisdom)
   {
     char export_buffer[200];
-    sprintf(export_buffer,"N%d_fftw3.wisdom", N);
+    sprintf(export_buffer,"KN%d_fftw3.wisdom", N);
     int numberwisdom = fftw_export_wisdom_to_filename(export_buffer);
   }
 
@@ -92,22 +122,29 @@ int main(void){
   potential_V(x, y, V);
   read_field(x, y, g, "g_full.dat");
   read_field(x, y, S, "S_full.dat");
-  compute_omega(omega_to_omega, k2, S, omega);
-  compute_utils(k2, S, pre_W, exp_k2, f, g, fft_sqrt_g, pre_W_to_pre_W, sqrt_g_to_sqrt_g);
-  
+  preliminaries(k2, g, S, omega, W, fft_sqrt_g);
+
+  #pragma omp parallel for
+  for (int i = 0; i < N * N; i++)
+  {
+    f[i] = g[i];
+  }
+
+  normalize_f(f);
+
   condition = true; 
   tolerance = 1e-6;
   long int counter = 1;
   while(condition)
   {
-    compute_kinetic(exp_k2, f, f_to_f);
-    compute_W_part(k2, S, g, fft_sqrt_g, pre_W, W, f, W_to_W, sqrt_g_to_sqrt_g);  
+    compute_kinetic1(expAx, expAy, f, p_x, p_y);
+    compute_W_part(fft_sqrt_g, W, f, W_to_W);  
     #pragma omp parallel for
     for (int i = 0; i < N * N; i++)
     {
-      f[i] *= exp(-(V[i] + omega[i] + W[i]) * dt);
+      f[i] *= exp(-(V[i] + omega[i]) * dt);
     }    
-    compute_kinetic(exp_k2, f, f_to_f); 
+    compute_kinetic1(expAx, expAy, f, p_x, p_y);
     normalize_f(f);
     printer_loop_f(counter, k2, g, f, V, omega, pre_W, W_to_W, f_to_f);
 
@@ -133,4 +170,6 @@ int main(void){
   delete[] pre_W;
   delete[] W;
   delete[] f;
+  delete[] expAx; 
+  delete[] expAy;
 }

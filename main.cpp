@@ -19,12 +19,12 @@ int main(void)
   dkx = dk;
   dky = dk;
 
-  U = 10;
+  U = 20;
   rho = 1;
   dt = 0.001;
   printf("N = %d, L = %1.0f, h = %1.6f, dk = %1.6f\n", N, L, h, dkx);
   printf("U = %1.2f, rho = %1.2f, dt = %1.4f\n", U, rho, dt);
-  int max_threads = 8;//omp_get_max_threads() / 2; // 16 cores 
+  int max_threads = 16;//omp_get_max_threads() / 2; // 16 cores 
   printf("Maximum number of threads = %d\n", max_threads);
   omp_set_num_threads(max_threads);
 
