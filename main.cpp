@@ -9,7 +9,7 @@ int main(void)
   N = 1 << 8;
   inv_N2 = 1. / ((double)(N * N));
 
-  L = 5.;
+  L = 2.;
   
   double h = 2. * L / (double)(2 * (N - 1));
   dx = h;
@@ -24,7 +24,7 @@ int main(void)
   dt = 0.001;
   printf("N = %d, L = %1.0f, h = %1.6f, dk = %1.6f\n", N, L, h, dkx);
   printf("U = %1.2f, rho = %1.2f, dt = %1.4f\n", U, rho, dt);
-  int max_threads = 16;//omp_get_max_threads() / 2; // 16 cores 
+  int max_threads = 8;//omp_get_max_threads() / 2; // 16 cores 
   printf("Maximum number of threads = %d\n", max_threads);
   omp_set_num_threads(max_threads);
 
@@ -72,9 +72,16 @@ int main(void)
     int numberwisdom = fftw_export_wisdom_to_filename(export_buffer);
   }
 
-  initialize_g_S(g, S);
+  initialize_g_S(x, y, g, S);
   memcpy(new_S, S, N * N * sizeof(double));
   geometry(x, y, kx, ky, k2);
+  /* The potential:
+  a) The gaussian potential: "GEM2"
+  b) The dipolar potential used by Robert Zillinger: "Dipolar_Zillinger"
+  c) The Rydberg potential: "Rydberg"
+  */
+
+
   potential_V(x, y, V, "Dipolar_Zillinger");
  
   condition = true; 

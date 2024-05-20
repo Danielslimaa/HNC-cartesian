@@ -106,19 +106,33 @@ void potential_V(double * x, double * y, double * V, const char * name)
       V[i] = U * exp(-x[i] * x[i] - y[i] * y[i]);
     }
   }
-  if (name == "Dipolar_Zillinger")
+  if ( name == "Rydberg")
   {
-    double C_h = 0.28;
-    double theta = 1.19;
-    double epsilon = 1e-6;
     #pragma omp parallel for
     for (int i = 0; i < N * N; i++)
     {
-      double r3 = pow(x[i] * x[i] + y[i] * y[i], 3/2) + epsilon;
-      double r5 = pow(x[i] * x[i] + y[i] * y[i], 5/2) + epsilon;
-      double r12 = pow(x[i] * x[i] + y[i] * y[i], 12/2) + epsilon;
-      double ex = x[i];
-      V[i] = ( (1. / r3) - (3. * ex * sin(theta) / ( r5)) ) + (1. / r12) * pow(C_h, 12);
+      double r = sqrt(x[i] * x[i] + y[i] * y[i]);
+      V[i] = U * (1. / (1. + pow(r, 6)));
+    }
+  }  
+  if (name == "Dipolar_Zillinger")
+  {
+    double C_h = 0.33;
+    double theta = 1.08;
+    double sin_theta = sin(theta);
+    double dl = 1;//L / double(N);
+    printf("dl = %1.6f\n", dl);
+
+    #pragma omp parallel for
+    for (int i = 0; i < N * N; i++)
+    {
+      double r = sqrt(x[i] * x[i] + y[i] * y[i] + dl * dl);      
+      double inverse_r = pow(r, -1);
+      double inverse_r3 = pow(r, -3);
+      double inverse_r5 = pow(r, -5);
+      double x_coordinate = x[i];
+      V[i] = ( inverse_r3 - (3. * x_coordinate * sin_theta * x_coordinate * sin_theta * inverse_r5) ) + pow(C_h * inverse_r, 12);
+      
     }
   } 
 }
@@ -135,13 +149,13 @@ void compute_omega(fftw_plan omega_to_omega, double * k2, double * S, double * o
   fftw_execute(omega_to_omega);
 }
 
-void initialize_g_S(double * g, double * S)
+void initialize_g_S(double * x, double * y, double * g, double * S)
 {
   #pragma omp parallel for
   for (int i = 0; i < N * N; i++)
   {
-    S[i] = 1.0;
-    g[i] = 1.0;
+    S[i] = 1.0;// - exp(-x[i] * x[i] - y[i] * y[i]);
+    g[i] = S[i];
   }
   return;  
 }
@@ -230,7 +244,7 @@ double compute_energy(double * k2, double * g, double * S, double * V)
     for (int j = 0; j < N - 2; j++)
     {
       double aux = S[i * N + j] - 1.;
-      tmp = c1 * V[i * N + j] * g[i * N + j];// + c2 * k2[i * N + j] * aux * aux * aux / S[i * N + j];
+      tmp = c1 * V[i * N + j] * g[i * N + j] + c2 * k2[i * N + j] * aux * aux * aux / S[i * N + j];
       tmp += c3 * g[i * N + j] * ( log(g[i * N + j + 2]) - 2. * log(g[i * N + j + 1]) + log(g[i * N + j]) ); // delyy_g
       tmp += c3 * g[i * N + j] * ( log(g[(i + 2) * N + j]) - 2. * log(g[(i + 1) * N + j]) + log(g[(i) * N + j]) ); // delxx_g
 
@@ -404,7 +418,7 @@ void printer_loop_f(long int counter, double * k2, double * g, double * f, doubl
 
 void print_loop(double * x, double * y, double * k2, double * g, double * V, double * S, double * new_S, long int counter)
 {
-  if(counter%1 == 0 or counter == 1)
+  if(counter%200 == 0 or counter == 1)
   {
     new_energy = compute_energy(k2, g, new_S, V);
     double error = abs(new_energy - energy) / dt;

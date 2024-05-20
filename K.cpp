@@ -13,13 +13,13 @@
 //g++ K.cpp -w -lfftw3_omp -lfftw3 -fopenmp -lm -O3
 
 int main(void){
-  N = 1 << 10;
+  N = 1 << 8;
   void fftw_cleanup_threads(void);
   fftw_cleanup();
   N = 1 << 8;
   inv_N2 = 1. / ((double)(N * N));
 
-  L = 5.;
+  L = 2.;
   
   double h = 2. * L / (double)(2 * (N - 1));
   dx = h;
@@ -29,9 +29,9 @@ int main(void){
   dkx = dk;
   dky = dk;
 
-  U = 20;
+  U = 1;
   rho = 2.50;
-  dt = 0.01;
+  dt = 0.001;
   printf("N = %d, L = %1.0f, h = %1.6f, dk = %1.6f\n", N, L, h, dkx);
   printf("U = %1.2f, rho = %1.2f, dt = %1.4f\n", U, rho, dt);
   int max_threads = 16;//omp_get_max_threads() / 2; // 16 cores 
@@ -51,7 +51,7 @@ int main(void){
   double * g = new double[N * N];
   double * sqrt_g = new double[N * N];
   double * fft_sqrt_g = new double[N * N];
-    //compute_W_part(fft_sqrt_g, W, f, W_to_W);  
+  //compute_W_part(fft_sqrt_g, W, f, W_to_W);  
   double * S = new double[N * N];
   double * omega = new double[N * N];
   double * Lg = new double[N * N];
