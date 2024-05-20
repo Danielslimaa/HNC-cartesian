@@ -30,7 +30,7 @@ int main(void){
   dky = dk;
 
   U = 20;
-  rho = 1;
+  rho = 2.50;
   dt = 0.01;
   printf("N = %d, L = %1.0f, h = %1.6f, dk = %1.6f\n", N, L, h, dkx);
   printf("U = %1.2f, rho = %1.2f, dt = %1.4f\n", U, rho, dt);
@@ -49,7 +49,9 @@ int main(void){
   double * exp_k2 = new double[N * N];
   double * V = new double[N * N];
   double * g = new double[N * N];
+  double * sqrt_g = new double[N * N];
   double * fft_sqrt_g = new double[N * N];
+    //compute_W_part(fft_sqrt_g, W, f, W_to_W);  
   double * S = new double[N * N];
   double * omega = new double[N * N];
   double * Lg = new double[N * N];
@@ -58,32 +60,13 @@ int main(void){
   double * f = new double[N * N];
   double * expAx = new double[N * N]; 
   double * expAy = new double[N * N];
+  double * Wx = new double[N * N];
+  double * Wy = new double[N * N];
 
   double p = dk;
 
-  //Operator in the x-direction
-  #pragma omp parallel for
-  for (int j = 0; j < N; j++)
-  {
-    for (int i = 0; i < N; i++)
-    {
-      double temp = (   pow(p * i, 2.0)  ) * dt / 2.0;
-      expAx[i * N + j] = exp(-temp) / (1.0 * N);
-    }    
-  }
-
-  //Operator in the y-direction
-  for (int i = 0; i < N; i++)
-  {    
-    for (int j = 0; j < N; j++)
-    {
-      double temp = (  pow(p * j, 2)  ) * dt / 2.0;
-      expAy[i * N + j] = exp(-temp) / (1.0 * N);
-    }    
-  }  
-
   unsigned flags;
-  bool with_wisdom = true;
+  bool with_wisdom = false;
   if(with_wisdom)
   {
     flags = FFTW_WISDOM_ONLY;
@@ -119,10 +102,31 @@ int main(void){
   }
 
   geometry(x, y, kx, ky, k2);
-  potential_V(x, y, V);
+  potential_V(x, y, V, "Dipolar_Zillinger");
   read_field(x, y, g, "g_full.dat");
   read_field(x, y, S, "S_full.dat");
-  preliminaries(k2, g, S, omega, W, fft_sqrt_g);
+  preliminaries(k2, g, S, omega, W, Wx, Wy, sqrt_g, fft_sqrt_g);
+
+  //Operator in the x-direction
+  #pragma omp parallel for
+  for (int j = 0; j < N; j++)
+  {
+    for (int i = 0; i < N; i++)
+    {
+      double temp = (   pow(p * i, 2.0) + rho * dx * dy * Wx[i] ) * dt / 2.0;
+      expAx[i * N + j] = exp(-temp) / (1.0 * N);
+    }    
+  }
+
+  //Operator in the y-direction
+  for (int i = 0; i < N; i++)
+  {    
+    for (int j = 0; j < N; j++)
+    {
+      double temp = (  pow(p * j, 2) + rho * dx * dy * Wy[i]  ) * dt / 2.0;
+      expAy[i * N + j] = exp(-temp) / (1.0 * N);
+    }    
+  }
 
   #pragma omp parallel for
   for (int i = 0; i < N * N; i++)
@@ -137,14 +141,14 @@ int main(void){
   long int counter = 1;
   while(condition)
   {
-    compute_kinetic1(expAx, expAy, f, p_x, p_y);
-    compute_W_part(fft_sqrt_g, W, f, W_to_W);  
+    compute_part1(expAx, expAy, f, sqrt_g, p_x, p_y);
+    //compute_W_part(fft_sqrt_g, W, f, W_to_W);  
     #pragma omp parallel for
     for (int i = 0; i < N * N; i++)
     {
       f[i] *= exp(-(V[i] + omega[i]) * dt);
     }    
-    compute_kinetic1(expAx, expAy, f, p_x, p_y);
+    compute_part1(expAx, expAy, f, sqrt_g, p_x, p_y);
     normalize_f(f);
     printer_loop_f(counter, k2, g, f, V, omega, pre_W, W_to_W, f_to_f);
 
@@ -163,6 +167,7 @@ int main(void){
   delete[] exp_k2;
   delete[] V;
   delete[] g;
+  delete[] sqrt_g;
   delete[] fft_sqrt_g;
   delete[] S;
   delete[] omega;
@@ -172,4 +177,6 @@ int main(void){
   delete[] f;
   delete[] expAx; 
   delete[] expAy;
+  delete[] Wx;
+  delete[] Wy;
 }

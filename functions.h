@@ -96,13 +96,31 @@ void geometry(double * x, double * y, double * kx, double * ky, double * k2)
   }  
 }
 
-void potential_V(double * x, double * y, double * V)
+void potential_V(double * x, double * y, double * V, const char * name)
 {
-  #pragma omp parallel for
-  for (int i = 0; i < N * N; i++)
+  if ( name == "GEM2")
   {
-    V[i] = U * exp(-x[i] * x[i] - y[i] * y[i]);
+    #pragma omp parallel for
+    for (int i = 0; i < N * N; i++)
+    {
+      V[i] = U * exp(-x[i] * x[i] - y[i] * y[i]);
+    }
   }
+  if (name == "Dipolar_Zillinger")
+  {
+    double C_h = 0.28;
+    double theta = 1.19;
+    double epsilon = 1e-6;
+    #pragma omp parallel for
+    for (int i = 0; i < N * N; i++)
+    {
+      double r3 = pow(x[i] * x[i] + y[i] * y[i], 3/2) + epsilon;
+      double r5 = pow(x[i] * x[i] + y[i] * y[i], 5/2) + epsilon;
+      double r12 = pow(x[i] * x[i] + y[i] * y[i], 12/2) + epsilon;
+      double ex = x[i];
+      V[i] = ( (1. / r3) - (3. * ex * sin(theta) / ( r5)) ) + (1. / r12) * pow(C_h, 12);
+    }
+  } 
 }
 
 void compute_omega(fftw_plan omega_to_omega, double * k2, double * S, double * omega)
@@ -288,6 +306,34 @@ void compute_kinetic2(double * expAx,
   fftw_execute(p_x);
 }
 
+void compute_part1(double * expAx, 
+                    double * expAy, 
+                    double * f,
+                    double * sqrt_g, 
+                    fftw_plan p_x, 
+                    fftw_plan p_y)
+{
+  #pragma omp parallel for
+  for(int i = 0; i < N * N; i++)
+  {
+    f[i] *= 1;//sqrt_g[i];
+  }
+  fftw_execute(p_x);
+  #pragma omp parallel for
+  for(int i = 0; i < N * N; i++)
+  {
+    f[i] *= expAx[i];
+  }  
+  fftw_execute(p_x);
+  fftw_execute(p_y);
+  #pragma omp parallel for
+  for(int i = 0; i < N * N; i++)
+  {
+    f[i] *= expAy[i];
+  }  
+  fftw_execute(p_y);
+}
+
 void normalize_f(double * f)
 {
   double sum, tmp = 0;
@@ -358,7 +404,7 @@ void printer_loop_f(long int counter, double * k2, double * g, double * f, doubl
 
 void print_loop(double * x, double * y, double * k2, double * g, double * V, double * S, double * new_S, long int counter)
 {
-  if(counter%200 == 0 or counter == 1)
+  if(counter%1 == 0 or counter == 1)
   {
     new_energy = compute_energy(k2, g, new_S, V);
     double error = abs(new_energy - energy) / dt;
@@ -399,10 +445,12 @@ void preliminaries(double * k2,
                 double * g, 
                 double * S, 
                 double * omega, 
-                double * W, 
+                double * W,
+                double * Wx,
+                double * Wy, 
+                double * sqrt_g,
                 double * fft_sqrt_g)
 {
-  double * sqrt_g = new double[N * N];
   double c1 = dkx * dky * ( 1.0 / (2. * M_PI * 2.0 * M_PI) );
   double c2 = dx * dy * rho;
 
@@ -425,16 +473,23 @@ void preliminaries(double * k2,
   #pragma omp parallel for 
   for (int i = 0; i < N * N; i++)
   {
-    W[i] = W[i] * sqrt_g[i]; // W(r - r')sqrt(g(r'))
+    W[i] = sqrt_g[i] * W[i]; // sqrt(g(r)) x W(r - r')
   }
+  fftw_r2r_kind kinds[] = {FFTW_REDFT00, FFTW_REDFT00};
+  int howmany = N;
+  fftw_plan p_Wx = fftw_plan_many_r2r(1, &N, howmany, W, NULL, howmany, 1, Wx, NULL, howmany, 1, kinds, FFTW_MEASURE);
+  fftw_plan p_Wy = fftw_plan_many_r2r(1, &N, howmany, W, NULL, 1, howmany, Wy, NULL, 1, howmany, kinds, FFTW_MEASURE);  
 
+  fftw_execute(p_Wx);
+  fftw_execute(p_Wy);
   fftw_execute(omega_to_omega); // omega(r')
   fftw_execute(sqrt_g_to_sqrt_g); // FFT{sqrt(g)}
 
   fftw_destroy_plan(omega_to_omega);
   fftw_destroy_plan(W_to_W);
   fftw_destroy_plan(sqrt_g_to_sqrt_g);
-  delete[] sqrt_g;
+  fftw_destroy_plan(p_Wx);
+  fftw_destroy_plan(p_Wy);
 }
 
 #endif

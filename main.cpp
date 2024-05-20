@@ -19,8 +19,8 @@ int main(void)
   dkx = dk;
   dky = dk;
 
-  U = 20;
-  rho = 1;
+  U = 1;
+  rho = 2.5;
   dt = 0.001;
   printf("N = %d, L = %1.0f, h = %1.6f, dk = %1.6f\n", N, L, h, dkx);
   printf("U = %1.2f, rho = %1.2f, dt = %1.4f\n", U, rho, dt);
@@ -75,7 +75,7 @@ int main(void)
   initialize_g_S(g, S);
   memcpy(new_S, S, N * N * sizeof(double));
   geometry(x, y, kx, ky, k2);
-  potential_V(x, y, V);  
+  potential_V(x, y, V, "Dipolar_Zillinger");
  
   condition = true; 
   tolerance = 1e-6;
@@ -89,7 +89,7 @@ int main(void)
     print_loop(x, y, k2, g, V, S, new_S, counter);    
     counter += 1;
   }
-  printf("\nThe computation has ended. Printing the fields.");
+  printf("\nThe computation has ended. Printing the fields.\n");
   printer_field(x, y, g, "g_full.dat");
   printer_field(x, y, S, "S_full.dat");
   
