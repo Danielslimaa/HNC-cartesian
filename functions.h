@@ -594,7 +594,7 @@ void S_from_g(double * g, double * S)
       tmp = (g[i * N + j] - 1) * cos(i * j * c1);
       sum += tmp;
     }
-    S[i * N + j] = c3;
+    S[i * N + j] = sum;
   }
   #pragma omp parallel for reduction(+ : sum) private(tmp)
   for(int i = 0; i < N; i++)
@@ -605,8 +605,67 @@ void S_from_g(double * g, double * S)
       tmp = S[i * N + j] * cos(i * j * c2);
       sum += tmp;
     }
-    S[i * N + j] = 1 + sum * c3;
+    S[i * N + j] = 1.0 + sum * c3;
   }  
+}
+
+void g_from_S(double * S, double * g)
+{
+  double sum, tmp = 0;
+  double c1 = dkx * dx;
+  double c2 = dky * dy;
+  double c3 = dkx * dky / (2. * M_PI * M_PI * rho);
+  #pragma omp parallel for reduction(+ : sum) private(tmp)
+  for(int j = 0; j < N; j++)
+  {
+    sum = 0;
+    for(int i = 0; i < N; i++)
+    {
+      tmp = (S[i * N + j] - 1) * cos(i * j * c1);
+      sum += tmp;
+    }
+    g[i * N + j] = sum;
+  }
+  #pragma omp parallel for reduction(+ : sum) private(tmp)
+  for(int i = 0; i < N; i++)
+  {
+    sum = 0;
+    for(int j = 0; j < N; j++)
+    {
+      tmp = g[i * N + j] * cos(i * j * c2);
+      sum += tmp;
+    }
+    g[i * N + j] = 1.0 + sum * c3;
+  }  
+}
+
+void compute_omega_r(fftw_plan omega_to_omega, double * k2, double * S, double * omega)
+{
+  double c = - dkx * dky * ( 1.0 / (2. * M_PI * 2.0 * M_PI * rho) ) * 0.25;
+  #pragma omp parallel for 
+  for (int i = 0; i < N * N; i++)
+  {
+    double aux = ( 1. - (1. / S[i]) );
+    omega[i] = c * k2[i] * ( 2. * S[i] + 1. ) * aux * aux; 
+  }  
+  fftw_execute(omega_to_omega);
+}
+
+void compute_Vph_k(double * V, double * g, double * omega, double * Vph)
+{
+  #pragma omp parallel for 
+  for (int i = 0; i < N - 4; i++)
+  {
+    for (int j = 0; j < N - 4; j++)
+    {
+      Vph[i * N + j] = g[i * N + j] * V[i * N + j];
+      double dely_g = 2. * g[i * N + j + 3] - 9. * g[i * N + j + 2] + 18. * g[i * N + j + 1] - 11. * g[i * N + j];
+      double delx_g = 2. * g[(i + 3) * N + j] - 9. * g[(i + 2) * N + j] + 18. * g[(i + 1) * N + j] - 11. * g[i * N + j];
+      Vph[i * N + j] += (delx_g * delx_g + dely_g * dely_g) / (6. * dx * 6. * dx * 4. * g[i * N + j]);
+      Vph[i * N + j] += (  g[i * N + j] - 1.  ) * omega[i * N + j];
+    } 
+  }   
+  return;
 }
 
 #endif
