@@ -6,10 +6,10 @@ int main(void)
 {
   void fftw_cleanup_threads(void);
   fftw_cleanup();
-  N = 1 << 8;
+  N = 1 << 10;
   inv_N2 = 1. / ((double)(N * N));
 
-  L = 2.;
+  L = 750.;
   
   double h = 2. * L / (double)(2 * (N - 1));
   dx = h;
@@ -19,12 +19,12 @@ int main(void)
   dkx = dk;
   dky = dk;
 
-  U = 1;
-  rho = 2.5;
-  dt = 0.001;
+  U = 0.01;
+  rho = 1.9;
+  dt = 0.0001;
   printf("N = %d, L = %1.0f, h = %1.6f, dk = %1.6f\n", N, L, h, dkx);
   printf("U = %1.2f, rho = %1.2f, dt = %1.4f\n", U, rho, dt);
-  int max_threads = 8;//omp_get_max_threads() / 2; // 16 cores 
+  int max_threads = 16;//omp_get_max_threads() / 2; // 16 cores 
   printf("Maximum number of threads = %d\n", max_threads);
   omp_set_num_threads(max_threads);
 
@@ -79,10 +79,11 @@ int main(void)
   a) The gaussian potential: "GEM2"
   b) The dipolar potential used by Robert Zillinger: "Dipolar_Zillinger"
   c) The Rydberg potential: "Rydberg"
+  d) The QC-hexagonal: "QC_hexagonal"
+  e) The Qc-dodecagonal: "QC_dodecagonal"
   */
 
-
-  potential_V(x, y, V, "Dipolar_Zillinger");
+  potential_V(x, y, k2, V, "QC_hexagonal");
  
   condition = true; 
   tolerance = 1e-6;

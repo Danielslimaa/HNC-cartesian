@@ -162,6 +162,7 @@ void potential_V(double * x, double * y, double * k2, double * V, const char * n
         V[i] = 10.0;
       }
     }
+    printer_field_transversal_view(x, y, V, "fftV.dat");
     fftw_plan p = fftw_plan_r2r_2d(N, N, V, V, FFTW_REDFT00, FFTW_REDFT00, FFTW_MEASURE);
     fftw_destroy_plan(p);
       #pragma omp parallel for
@@ -169,6 +170,8 @@ void potential_V(double * x, double * y, double * k2, double * V, const char * n
     {
       V[i] *= dkx * dky;
     }
+    printer_field_transversal_view(x, y, V, "V.dat");
+
   }  
   if (name == "QC_dodecagonal")
   {
