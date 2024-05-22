@@ -9,7 +9,7 @@ int main(void)
   N = 1 << 8;
   inv_N2 = 1. / ((double)(N * N));
 
-  L = 2.;
+  L = 5.;
   
   double h = 2. * L / (double)(2 * (N - 1));
   dx = h;
@@ -19,8 +19,8 @@ int main(void)
   dkx = dk;
   dky = dk;
 
-  U = 1;
-  rho = 2.5;
+  U = 1.5;
+  rho = 0.6;
   dt = 0.001;
   printf("N = %d, L = %1.0f, h = %1.6f, dk = %1.6f\n", N, L, h, dkx);
   printf("U = %1.2f, rho = %1.2f, dt = %1.4f\n", U, rho, dt);
@@ -81,9 +81,7 @@ int main(void)
   c) The Rydberg potential: "Rydberg"
   */
 
-
-  potential_V(x, y, V, "Dipolar_Zillinger");
- 
+  potential_V(x, y, V, "Rydberg");
   condition = true; 
   tolerance = 1e-6;
   long int counter = 1;

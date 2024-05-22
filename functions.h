@@ -139,7 +139,7 @@ void potential_V(double * x, double * y, double * V, const char * name)
 
 void compute_omega(fftw_plan omega_to_omega, double * k2, double * S, double * omega)
 {
-  double c = - dkx * dky * ( 1.0 / (2. * M_PI * 2.0 * M_PI * rho) ) * 0.25;
+  double c = - dkx * dky * ( 1.0 / (2. * M_PI * 2.0 * M_PI * rho) ) * 0.5;
   #pragma omp parallel for 
   for (int i = 0; i < N * N; i++)
   {
@@ -194,7 +194,7 @@ void compute_Vph(double * V, double * g, double * omega, double * Vph)
       Vph[i * N + j] = g[i * N + j] * V[i * N + j];
       double dely_g = 2. * g[i * N + j + 3] - 9. * g[i * N + j + 2] + 18. * g[i * N + j + 1] - 11. * g[i * N + j];
       double delx_g = 2. * g[(i + 3) * N + j] - 9. * g[(i + 2) * N + j] + 18. * g[(i + 1) * N + j] - 11. * g[i * N + j];
-      Vph[i * N + j] += (delx_g * delx_g + dely_g * dely_g) / (6. * dx * 6. * dx * 4. * g[i * N + j]);
+      Vph[i * N + j] += (delx_g * delx_g + dely_g * dely_g) / (6. * dx * 6. * dx * 2. * g[i * N + j]);
       Vph[i * N + j] += (  g[i * N + j] - 1.  ) * omega[i * N + j];
     } 
   }   
@@ -414,7 +414,6 @@ void printer_loop_f(long int counter, double * k2, double * g, double * f, doubl
     delete[] Lf;
   }
 }
-
 
 void print_loop(double * x, double * y, double * k2, double * g, double * V, double * S, double * new_S, long int counter)
 {
