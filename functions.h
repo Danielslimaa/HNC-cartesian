@@ -96,7 +96,7 @@ void geometry(double * x, double * y, double * kx, double * ky, double * k2)
   }  
 }
 
-void potential_V(double * x, double * y, double * V, const char * name)
+void potential_V(double * x, double * y, double * k2, double * V, const char * name)
 {
   if ( name == "GEM2")
   {
@@ -135,6 +135,76 @@ void potential_V(double * x, double * y, double * V, const char * name)
       
     }
   } 
+  if (name == "QC_hexagonal")
+  {
+    #pragma omp parallel for
+    for (int i = 0; i < N * N; i++)
+    {
+      double k = sqrt(k2[i]);
+      if(k <= 0.749)
+      {
+        V[i] = 5.0;
+      }      
+      if(k > 0.749 && k <= 1.251)
+      {
+        V[i] = -1.0 + 96.0 * pow((-1.0 + k), 2);
+      }
+      if(k > 1.251 && k <= 1.749)
+      {
+        V[i] = 5.0;
+      }
+      if (k > 1.749 && k <= 2.17908)
+      {
+        V[i] = -1.0 + 181.433 * (-sqrt(2 + sqrt(3)) + k) * (-sqrt(2 + sqrt(3)) + k);
+      }
+      if(k > 2.17908)
+      {
+        V[i] = 10.0;
+      }
+    }
+    fftw_plan p = fftw_plan_r2r_2d(N, N, V, V, FFTW_REDFT00, FFTW_REDFT00, FFTW_MEASURE);
+    fftw_destroy_plan(p);
+      #pragma omp parallel for
+    for (int i = 0; i < N * N; i++)
+    {
+      V[i] *= dkx * dky;
+    }
+  }  
+  if (name == "QC_dodecagonal")
+  {
+    #pragma omp parallel for
+    for (int i = 0; i < N * N; i++)
+    {
+      double k = sqrt(k2[i]);
+      if(k <= 0.749)
+      {
+        V[i] = 5.0;
+      }      
+      if(k > 0.749 && k <= 1.251)
+      {
+        V[i] = -1.0 + 96.0 * pow((-1.0 + k), 2);
+      }
+      if(k > 1.251 && k <= 1.749)
+      {
+        V[i] = 5.0;
+      }
+      if (k > 1.749 && k <= 2.167)
+      {
+        V[i] = -1.0 + 229.815 * (-sqrt(2 + sqrt(3)) + k) * (-sqrt(2 + sqrt(3)) + k);
+      }
+      if(k > 2.167)
+      {
+        V[i] = 10.0;
+      }
+    }
+    fftw_plan p = fftw_plan_r2r_2d(N, N, V, V, FFTW_REDFT00, FFTW_REDFT00, FFTW_MEASURE);
+    fftw_destroy_plan(p);
+      #pragma omp parallel for
+    for (int i = 0; i < N * N; i++)
+    {
+      V[i] *= dkx * dky;
+    }
+  }  
 }
 
 void compute_omega(fftw_plan omega_to_omega, double * k2, double * S, double * omega)
@@ -418,7 +488,7 @@ void printer_loop_f(long int counter, double * k2, double * g, double * f, doubl
 
 void print_loop(double * x, double * y, double * k2, double * g, double * V, double * S, double * new_S, long int counter)
 {
-  if(counter%200 == 0 or counter == 1)
+  if(counter%1 == 0 or counter == 1)
   {
     new_energy = compute_energy(k2, g, new_S, V);
     double error = abs(new_energy - energy) / dt;
