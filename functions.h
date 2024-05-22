@@ -579,4 +579,34 @@ void preliminaries(double * k2,
   fftw_destroy_plan(p_Wy);
 }
 
+void S_from_g(double * g, double * S)
+{
+  double sum, tmp = 0;
+  double c1 = dkx * dx;
+  double c2 = dky * dy;
+  double c3 = dx * dy * rho;
+  #pragma omp parallel for reduction(+ : sum) private(tmp)
+  for(int j = 0; j < N; j++)
+  {
+    sum = 0;
+    for(int i = 0; i < N; i++)
+    {
+      tmp = (g[i * N + j] - 1) * cos(i * j * c1);
+      sum += tmp;
+    }
+    S[i * N + j] = c3;
+  }
+  #pragma omp parallel for reduction(+ : sum) private(tmp)
+  for(int i = 0; i < N; i++)
+  {
+    sum = 0;
+    for(int j = 0; j < N; j++)
+    {
+      tmp = S[i * N + j] * cos(i * j * c2);
+      sum += tmp;
+    }
+    S[i * N + j] = 1 + sum * c3;
+  }  
+}
+
 #endif
