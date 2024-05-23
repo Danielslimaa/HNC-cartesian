@@ -639,7 +639,7 @@ void g_from_S(double * S, double * g)
   }  
 }
 
-void compute_omega_r(fftw_plan omega_to_omega, double * k2, double * S, double * omega)
+void compute_omega_r(double * k2, double * S, double * omega)
 {
   double c = - dkx * dky * ( 1.0 / (2. * M_PI * 2.0 * M_PI * rho) ) * 0.25;
   #pragma omp parallel for 
@@ -648,7 +648,32 @@ void compute_omega_r(fftw_plan omega_to_omega, double * k2, double * S, double *
     double aux = ( 1. - (1. / S[i]) );
     omega[i] = c * k2[i] * ( 2. * S[i] + 1. ) * aux * aux; 
   }  
-  fftw_execute(omega_to_omega);
+  double sum, tmp = 0;
+  double c1 = dkx * dx;
+  double c2 = dky * dy;
+  double c3 = dkx * dky / (2. * M_PI * M_PI * rho);
+  #pragma omp parallel for reduction(+ : sum) private(tmp)
+  for(int j = 0; j < N; j++)
+  {
+    sum = 0;
+    for(int i = 0; i < N; i++)
+    {
+      tmp = (S[i * N + j] - 1) * cos(i * j * c1);
+      sum += tmp;
+    }
+    g[i * N + j] = sum;
+  }
+  #pragma omp parallel for reduction(+ : sum) private(tmp)
+  for(int i = 0; i < N; i++)
+  {
+    sum = 0;
+    for(int j = 0; j < N; j++)
+    {
+      tmp = g[i * N + j] * cos(i * j * c2);
+      sum += tmp;
+    }
+    g[i * N + j] = 1.0 + sum * c3;
+  }
 }
 
 void compute_Vph_k(double * V, double * g, double * omega, double * Vph)
