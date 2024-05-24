@@ -308,7 +308,8 @@ void compute_g(fftw_plan g_to_g, double * S, double * g)
 
 double compute_energy(double * k2, double * g, double * S, double * V)
 {
-  double c1 = (rho / 2.) * dx * dy;
+  double alpha = (double)(padded_N - 1) / (double)(N - 1);
+  double c1 = (rho / 2.) * dx * dy * alpha * alpha;
   double c2 = - (1. / 8.) * ( 1. / (2. * M_PI * 2. * M_PI * rho) ) * dkx * dky;
   double c3 = - (rho / 2.) * 0.25;
   double sum, tmp = 0;
@@ -491,7 +492,7 @@ void printer_loop_f(long int counter, double * k2, double * g, double * f, doubl
 
 void print_loop(double * x, double * y, double * k2, double * g, double * V, double * S, double * new_S, long int counter)
 {
-  if(counter%1000 == 0 or counter == 1)
+  if(counter%200 == 0 or counter == 1)
   {
     new_energy = compute_energy(k2, g, new_S, V);
     double error = abs(new_energy - energy) / dt;
@@ -504,7 +505,7 @@ void print_loop(double * x, double * y, double * k2, double * g, double * V, dou
       //printer_field(x, y, g, "g.dat");
       //printer_field(x, y, S, "S.dat");
     }
-    memcpy(new_S, S, padded_N * padded_N * sizeof(double));
+    memcpy(new_S, S, N * N * sizeof(double));
     energy = new_energy;
     condition = aux_condition;
   }
@@ -519,7 +520,7 @@ void read_field(double * x, double *y, double * vetor, const char * name)
   }
   else
   {
-    for (int i = 0; i < N * N; ++i)
+    for (int i = 0; i < padded_N * padded_N; ++i)
     {
       myfile >> x[i] >> y[i] >> vetor[i];
       myfile.ignore(1, '\t');

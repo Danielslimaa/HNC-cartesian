@@ -6,7 +6,7 @@ int main(void)
 {
   void fftw_cleanup_threads(void);
   fftw_cleanup();
-  padded_N = 1 << 8;
+  padded_N = 1 << 7;
   N = padded_N / 1;
   inv_N2 = 1. / ((double)((padded_N - 1) * (padded_N - 1)));
   L = 5.;
@@ -24,7 +24,7 @@ int main(void)
   dt = 0.001;
   printf("N = %d, L = %1.0f, h = %1.6f, dk = %1.6f\n", N, L, h, dkx);
   printf("U = %1.2f, rho = %1.2f, dt = %1.4f\n", U, rho, dt);
-  int max_threads = 16;//omp_get_max_threads() / 2; // 16 cores 
+  int max_threads = 8;//omp_get_max_threads() / 2; // 16 cores 
   printf("Maximum number of threads = %d\n", max_threads);
   omp_set_num_threads(max_threads);
 
@@ -84,11 +84,10 @@ int main(void)
     sprintf(export_buffer,"N%d_fftw3.wisdom", N);
     int numberwisdom = fftw_export_wisdom_to_filename(export_buffer);
   }
-
   initialize_g_S(x, y, g, S);
   printer_field_transversal_view(x, y, S, "Si.dat");
   printer_field_transversal_view(x, y, g, "gi.dat");
-  memcpy(new_S, S, N * N * sizeof(double));
+  memcpy(new_S, S, padded_N * padded_N * sizeof(double));
   geometry(x, y, kx, ky, k2);
   /* The potential:
   a) The gaussian potential: "GEM2"
@@ -97,7 +96,6 @@ int main(void)
   d) The QC-hexagonal: "QC_hexagonal"
   e) The Qc-dodecagonal: "QC_dodecagonal"
   */
-
   potential_V(x, y, k2, V, "GEM2");
   printer_field_transversal_view(x, y, V, "V.dat");
   condition = true; 
@@ -115,7 +113,8 @@ int main(void)
   printf("\nThe computation has ended. Printing the fields.\n");
   printer_field(x, y, g, "g_full.dat");
   printer_field(x, y, S, "S_full.dat");
-  
+  printer_field_transversal_view(x, y, g, "gf.dat");
+  printer_field_transversal_view(x, y, S, "Sf.dat");
   void fftw_cleanup_threads(void);
   fftw_cleanup();
   fftw_free(x);

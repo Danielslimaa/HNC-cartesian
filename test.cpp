@@ -6,9 +6,9 @@ int main(void)
 {
   void fftw_cleanup_threads(void);
   fftw_cleanup();
-  padded_N = 1 << 10;
+  padded_N = 1 << 8;
   N = padded_N / 2;
-  inv_N2 = 1. / ((double)(padded_N * padded_N));
+  inv_N2 = 1. / ((double)(1. * (padded_N - 1) * (padded_N - 1)));
 
   L = 5.;
   
@@ -58,19 +58,26 @@ int main(void)
   memset(omega, 0, sizeof(double) * padded_N * padded_N);
   memset(Lg, 0, sizeof(double) * padded_N * padded_N);
 
-  fftw_plan p =  fftw_plan_r2r_2d(padded_N, padded_N, g, g, FFTW_REDFT00, FFTW_REDFT00, FFTW_MEASURE);
- 
-  read_field(x, y, g, "g_full.dat");
+  fftw_plan p = fftw_plan_r2r_2d(padded_N, padded_N, g, g, FFTW_REDFT00, FFTW_REDFT00, FFTW_MEASURE);
+  fftw_plan pS = fftw_plan_r2r_2d(padded_N, padded_N, S, S, FFTW_REDFT00, FFTW_REDFT00, FFTW_MEASURE);
 
+  read_field(g, "gf.dat");
+  read_field(S, "Sf.dat");
+  printer_field_transversal_view(x, y, g, "gf0.dat");
+  printer_field_transversal_view(x, y, S, "Sf0.dat");
   fftw_execute(p);
-  printer_field_transversal_view(x, y, g, "gt.dat");
+  fftw_execute(pS);
+  //printer_field_transversal_view(x, y, g, "gt.dat");
   fftw_execute(p);
+  fftw_execute(pS);
   #pragma omp parallel for
-  for(int i = 0; i < padded_N * padded_N; i++)
+  for(int i = 0; i < N * N; i++)
   {
     g[i] *= inv_N2 * 0.25;
+    S[i] *= inv_N2 * 0.25;
   }
-  printer_field(x, y, g, "g_full2.dat");
+  printer_field_transversal_view(x, y, g, "gf2.dat");
+  printer_field_transversal_view(x, y, S, "Sf2.dat");
   
   void fftw_cleanup_threads(void);
   fftw_cleanup();
