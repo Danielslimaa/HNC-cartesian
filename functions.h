@@ -50,13 +50,13 @@ void geometry(double * x, double * y, double * kx, double * ky, double * k2)
 {
   double alpha = (double)(padded_N - 1) / (double)(N - 1);
   #pragma omp parallel for
-  for (int i = 0; i < N; i++)
+  for (int i = 0; i < padded_N; i++)
   {
-    for (int j = 0; j < N; j++)
+    for (int j = 0; j < padded_N; j++)
     { 
       // Option 1: [0, L - h] x [0, L - h]
-      x[i * N + j] = 0 + i * dx * alpha; 
-      y[i * N + j] = 0 + j * dy * alpha;
+      x[i * padded_N + j] = 0 + i * dx * alpha; 
+      y[i * padded_N + j] = 0 + j * dy * alpha;
       
       // Option 2, the traditional one: [-L / 2, L / 2] x [-L / 2, L / 2]
       //x[i * N + j] = (-L / 2) + (i - 1) * dx; 
@@ -65,11 +65,11 @@ void geometry(double * x, double * y, double * kx, double * ky, double * k2)
   }
 
   #pragma omp parallel for
-  for (int i = 0; i < N; i++)
+  for (int i = 0; i < padded_N; i++)
   {
-    for (int j = 0; j < N; j++)
+    for (int j = 0; j < padded_N; j++)
     {
-      kx[i * N + j] = i * 2.0 * M_PI / (2. * L);
+      kx[i * padded_N + j] = i * 2.0 * M_PI / (2. * L);
     }    
     //for (int j = N / 2; j < N; j++)
     //{
@@ -78,11 +78,11 @@ void geometry(double * x, double * y, double * kx, double * ky, double * k2)
   }
   
   #pragma omp parallel for
-  for (int j = 0; j < N; j++)
+  for (int j = 0; j < padded_N; j++)
   {    
-    for (int i = 0; i < N; i++)
+    for (int i = 0; i < padded_N; i++)
     {
-      ky[i * N + j] = j * 2.0 * M_PI / (2. * L);
+      ky[i * padded_N + j] = j * 2.0 * M_PI / (2. * L);
     }    
     //for (int i = N / 2; i < N; i++)
     //{
@@ -91,7 +91,7 @@ void geometry(double * x, double * y, double * kx, double * ky, double * k2)
   }
 
   #pragma omp parallel for
-  for (int i = 0; i < N * N; i++)
+  for (int i = 0; i < padded_N * padded_N; i++)
   {    
     k2[i] = kx[i] * kx[i] + ky[i] * ky[i];
   }  
@@ -215,7 +215,7 @@ void compute_omega(fftw_plan omega_to_omega, double * k2, double * S, double * o
 {
   double c = - dkx * dky * ( 1.0 / (2. * M_PI * 2.0 * M_PI * rho) ) * 0.25;
   #pragma omp parallel for 
-  for (int i = 0; i < N * N; i++)
+  for (int i = 0; i < padded_N * padded_N; i++)
   {
     double aux = ( 1. - (1. / S[i]) );
     omega[i] = c * k2[i] * ( 2. * S[i] + 1. ) * aux * aux; 
@@ -280,7 +280,7 @@ void update_S(fftw_plan Vph_to_Vph, double * k2, double * Vph, double * S)
   double c = rho * dx * dy;
   fftw_execute(Vph_to_Vph);
   #pragma omp parallel for 
-  for (int i = 0; i < N * N; i++)
+  for (int i = 0; i < padded_N * padded_N; i++)
   {
     Vph[i] *= c;
     double dS = sqrt( k2[i] / ( k2[i] + 4. * Vph[i] ) );
@@ -293,17 +293,28 @@ void compute_g(fftw_plan g_to_g, double * S, double * g)
 {
   double c = dkx * dky / (2. * M_PI * 2. * M_PI * rho);
   #pragma omp parallel for 
-  for (int i = 0; i < N * N; i++)
+  for (int i = 0; i < padded_N * padded_N; i++)
   {
     g[i] = S[i] - 1.; 
   }
   fftw_execute(g_to_g);
   #pragma omp parallel for 
-  for (int i = 0; i < N * N; i++)
+  for (int i = 0; i < padded_N * padded_N; i++)
   {
     g[i] = 1. + c * g[i];
   } 
-  return;
+  double * aux = (double *)fftw_malloc(sizeof(double) * N * N);
+  #pragma omp parallel for 
+  for (int i = 0; i < N; i++)
+  {
+    for (int j = 0; j < N; j++)
+    {
+      aux[i] = g[i];
+    }    
+  }  
+  memset(g, 0, sizeof(double) * padded_N * padded_N);
+  memcpy(g, aux, N * N * sizeof(double));
+  fftw_free(aux);
 }
 
 double compute_energy(double * k2, double * g, double * S, double * V)
@@ -492,7 +503,7 @@ void printer_loop_f(long int counter, double * k2, double * g, double * f, doubl
 
 void print_loop(double * x, double * y, double * k2, double * g, double * V, double * S, double * new_S, long int counter)
 {
-  if(counter%200 == 0 or counter == 1)
+  if(counter%1 == 0 or counter == 1)
   {
     new_energy = compute_energy(k2, g, new_S, V);
     double error = abs(new_energy - energy) / dt;

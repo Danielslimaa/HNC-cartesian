@@ -6,12 +6,12 @@ int main(void)
 {
   void fftw_cleanup_threads(void);
   fftw_cleanup();
-  padded_N = 1 << 7;
-  N = padded_N / 1;
+  padded_N = 1 << 8;
+  N = padded_N / 2;
   inv_N2 = 1. / ((double)((padded_N - 1) * (padded_N - 1)));
   L = 5.;
   
-  double h = 2. * L / (double)(2 * (padded_N - 1));
+  double h = 2. * L / (double)(2. * (padded_N - 1));
   dx = h;
   dy = h;
   
@@ -58,7 +58,7 @@ int main(void)
   memset(Lg, 0, sizeof(double) * padded_N * padded_N);
 
   unsigned flags;
-  bool with_wisdom = false;
+  bool with_wisdom = true;
   if(with_wisdom)
   {
     flags = FFTW_WISDOM_ONLY;
