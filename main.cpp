@@ -6,8 +6,8 @@ int main(void)
 {
   void fftw_cleanup_threads(void);
   fftw_cleanup();
-  padded_N = 1 << 9;
-  N = padded_N / 2;
+  padded_N = 1 << 8;
+  N = padded_N / 1;
   inv_N2 = 1. / ((double)((padded_N - 1) * (padded_N - 1)));
   L = 5.;
   
@@ -131,4 +131,4 @@ int main(void)
   fftw_free(omega);
   fftw_free(Lg);
   return 0;
-}
+}  
