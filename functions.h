@@ -48,14 +48,15 @@ void printer_field_transversal_view(double * x, double * y, double *vetor, const
 
 void geometry(double * x, double * y, double * kx, double * ky, double * k2)
 {
+  double alpha = (double)(padded_N - 1) / (double)(N - 1);
   #pragma omp parallel for
   for (int i = 0; i < N; i++)
   {
     for (int j = 0; j < N; j++)
     { 
       // Option 1: [0, L - h] x [0, L - h]
-      x[i * N + j] = 0 + i * dx; 
-      y[i * N + j] = 0 + j * dy;
+      x[i * N + j] = 0 + i * dx * alpha; 
+      y[i * N + j] = 0 + j * dy * alpha;
       
       // Option 2, the traditional one: [-L / 2, L / 2] x [-L / 2, L / 2]
       //x[i * N + j] = (-L / 2) + (i - 1) * dx; 
@@ -212,7 +213,7 @@ void potential_V(double * x, double * y, double * k2, double * V, const char * n
 
 void compute_omega(fftw_plan omega_to_omega, double * k2, double * S, double * omega)
 {
-  double c = - dkx * dky * ( 1.0 / (2. * M_PI * 2.0 * M_PI * rho) ) * 0.5;
+  double c = - dkx * dky * ( 1.0 / (2. * M_PI * 2.0 * M_PI * rho) ) * 0.25;
   #pragma omp parallel for 
   for (int i = 0; i < N * N; i++)
   {
@@ -267,7 +268,7 @@ void compute_Vph(double * V, double * g, double * omega, double * Vph)
       Vph[i * N + j] = g[i * N + j] * V[i * N + j];
       double dely_g = 2. * g[i * N + j + 3] - 9. * g[i * N + j + 2] + 18. * g[i * N + j + 1] - 11. * g[i * N + j];
       double delx_g = 2. * g[(i + 3) * N + j] - 9. * g[(i + 2) * N + j] + 18. * g[(i + 1) * N + j] - 11. * g[i * N + j];
-      Vph[i * N + j] += (delx_g * delx_g + dely_g * dely_g) / (6. * dx * 6. * dx * 2. * g[i * N + j]);
+      Vph[i * N + j] += (delx_g * delx_g + dely_g * dely_g) / (6. * dx * 6. * dx * 4. * g[i * N + j]);
       Vph[i * N + j] += (  g[i * N + j] - 1.  ) * omega[i * N + j];
     } 
   }   
@@ -490,7 +491,7 @@ void printer_loop_f(long int counter, double * k2, double * g, double * f, doubl
 
 void print_loop(double * x, double * y, double * k2, double * g, double * V, double * S, double * new_S, long int counter)
 {
-  if(counter%1 == 0 or counter == 1)
+  if(counter%1000 == 0 or counter == 1)
   {
     new_energy = compute_energy(k2, g, new_S, V);
     double error = abs(new_energy - energy) / dt;
