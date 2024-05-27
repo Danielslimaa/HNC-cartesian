@@ -261,14 +261,7 @@ void compute_second_step(fftw_plan p_S, fftw_plan p_omega, double * k2, double *
   {
     for (int j = 0; j < P; j++)
     {
-      if (i >= N || j >= N)
-      {
-        S[i * P + j] = 0;
-      }
-      else
-      {
-        S[i * P + j] = (g[i * P + j] * g[i * P + j] - 1.0);
-      } 
+      S[i * P + j] = (g[i * P + j] * g[i * P + j] - 1.0);
     }
   }
   fftw_execute(p_S);
@@ -277,14 +270,7 @@ void compute_second_step(fftw_plan p_S, fftw_plan p_omega, double * k2, double *
   {
     for (int j = 0; j < P; j++)
     {
-      if (i >= N || j >= N)
-      {
-        S[i * P + j] = 0;
-      }
-      else
-      {
-        S[i * P + j] = 1.0 + c * S[i * P + j];
-      } 
+      S[i * P + j] = 1.0 + c * S[i * P + j]; 
     }
   }
   S[0] = S[1];
@@ -292,7 +278,7 @@ void compute_second_step(fftw_plan p_S, fftw_plan p_omega, double * k2, double *
   #pragma omp parallel for
   for (int i = 0; i < N * N; i++)
   {
-    g[i] *= exp(-(V[i] + omega[i]) * dt * 0.5);
+    g[i] *= exp(-(V[i] + omega[i]) * dt);
   }
 }
 
@@ -607,7 +593,7 @@ void normalize_g(double * g)
   #pragma omp parallel for reduction(+ : sum) private(tmp)
   for(int i = 0; i < N * N; i++)
   {
-    tmp = g[i] * g[i] * g[i] * g[i];
+    tmp = g[i] * g[i];
     sum += tmp;
   }
   sum *= dx * dy;
@@ -769,7 +755,7 @@ void preliminaries_TSSP(double * expAx, double * expAy)
   {
     for (int i = 0; i < N; i++)
     {
-      double temp = (   pow(p * i, 2.0)   ) * dt / 1.0;
+      double temp = (   pow(p * i, 2.0)   ) * dt / 2.0;
       expAx[i * N + j] = exp(-temp) / (2.0 * ((double)N - 1.));
     }    
   }
@@ -779,7 +765,7 @@ void preliminaries_TSSP(double * expAx, double * expAy)
   {    
     for (int j = 0; j < N; j++)
     {
-      double temp = (  pow(p * j, 2)  ) * dt / 10;
+      double temp = (  pow(p * j, 2)  ) * dt / 2.0;
       expAy[i * N + j] = exp(-temp) / (2.0 * ((double)N - 1.));
     }    
   } 
