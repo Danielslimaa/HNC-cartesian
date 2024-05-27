@@ -15,10 +15,10 @@
 int main(void){
   void fftw_cleanup_threads(void);
   fftw_cleanup();
-  P = 1 << 10;
+  P = 1 << 8;
   N = P / 1;
   inv_N2 = 1. / ((double)((P - 1) * (P - 1)));
-  L = 500.;
+  L = 10.;
   
   double h = 2. * L / (double)(2 * (P - 1));
   dx = h;
@@ -30,10 +30,10 @@ int main(void){
 
   U = 10.;
   rho = 1.0;
-  dt = 0.001;
+  dt = 0.00001;
   printf("N = %d, L = %1.0f, h = %1.6f, dk = %1.6f\n", N, L, h, dkx);
   printf("U = %1.2f, rho = %1.2f, dt = %1.4f\n", U, rho, dt);
-  int max_threads = 16;//omp_get_max_threads() / 2; // 16 cores 
+  int max_threads = 8;//omp_get_max_threads() / 2; // 16 cores 
   printf("Maximum number of threads = %d\n", max_threads);
   omp_set_num_threads(max_threads);
 
@@ -57,7 +57,7 @@ int main(void){
   double p = dk;
 
   unsigned flags;
-  bool with_wisdom = false;
+  bool with_wisdom = true;
   if(with_wisdom)
   {
     flags = FFTW_WISDOM_ONLY;
@@ -104,6 +104,7 @@ int main(void){
   printer_field_transversal_view(x, y, V, "QC_dodecagonal.dat");
   potential_V(x, y, k2, V, "QC_hexagonal");
   printer_field_transversal_view(x, y, V, "QC_hexagonal.dat");
+  potential_V(x, y, k2, V, "GEM2");
   preliminaries_TSSP(expAx, expAy);
   initialize_g_S(x, y, g, S);
 
@@ -112,10 +113,19 @@ int main(void){
   long int counter = 1;
   while(condition)
   {
-    compute_kinetic(expAx, expAy, g, p_x, p_y);  
+    //compute_kinetic(expAx, expAy, g, p_x, p_y);  
     compute_second_step(p_S, p_omega, k2, S, g, omega, V);    
-    compute_kinetic(expAx, expAy, g, p_x, p_y);  
-    normalize_g(g);    
+    if(counter%2==0)
+    {
+      compute_kinetic_xfirst(expAx, expAy, g, p_x, p_y);  
+    }
+    else
+    {
+      compute_kinetic_yfirst(expAx, expAy, g, p_x, p_y);  
+    }
+    compute_second_step(p_S, p_omega, k2, S, g, omega, V); 
+    
+    //normalize_g(g);    
     print_loop(x, y, k2, g, V, S, new_S, counter);
     counter += 1;
   }
