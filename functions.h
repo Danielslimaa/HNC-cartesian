@@ -11,7 +11,7 @@
 #include <omp.h>
 #include <fftw3.h>
 
-int N, padded_N;
+int N, P;
 double inv_N2;
 double L; 
 double dx, dy, dkx, dky;
@@ -34,13 +34,28 @@ void printer_field(double * x, double * y, double *vetor, const char * name)
 	return;
 }
 
+void printer_field2(double *vetor, const char * name)
+{
+	std::ofstream myfile(name);
+	for (int i = 0; i < P; ++i)
+	{
+    for (int j = 0; j < P; ++j)
+		{
+      myfile << '\t' << vetor[i * P + j];
+    }
+    myfile << '\n';
+	}
+	myfile.close();
+	return;
+}
+
 void printer_field_transversal_view(double * x, double * y, double *vetor, const char * name)
 {
 	std::ofstream myfile;
 	myfile.open(name);
 	for (int i = 0; i < N; ++i)
 	{
-		myfile << vetor[i * N + 0] << "\n";
+		myfile << vetor[i * P+ 0] << "\n";
 	}
 	myfile.close();
 	return;
@@ -48,19 +63,24 @@ void printer_field_transversal_view(double * x, double * y, double *vetor, const
 
 void geometry(double * x, double * y, double * kx, double * ky, double * k2)
 {
-  double alpha = (double)(padded_N - 1) / (double)(N - 1);
+  double alpha = 1;//(double)(P - 1) / (double)(N - 1);
   #pragma omp parallel for
   for (int i = 0; i < padded_N; i++)
   {
     for (int j = 0; j < padded_N; j++)
     { 
       // Option 1: [0, L - h] x [0, L - h]
+<<<<<<< HEAD
       x[i * padded_N + j] = 0 + i * dx * alpha; 
       y[i * padded_N + j] = 0 + j * dy * alpha;
       
+=======
+      x[i * P + j] = 0 + i * dx * alpha; 
+      y[i * P + j] = 0 + j * dy * alpha;      
+>>>>>>> 31e3fb0 (-)
       // Option 2, the traditional one: [-L / 2, L / 2] x [-L / 2, L / 2]
-      //x[i * N + j] = (-L / 2) + (i - 1) * dx; 
-      //y[i * N + j] = (-L / 2) + (j - 1) * dy;
+      //x[i * P + j] = (-L / 2) + (i - 1) * dx; 
+      //y[i * P + j] = (-L / 2) + (j - 1) * dy;
     }
   }
 
@@ -69,11 +89,15 @@ void geometry(double * x, double * y, double * kx, double * ky, double * k2)
   {
     for (int j = 0; j < padded_N; j++)
     {
+<<<<<<< HEAD
       kx[i * padded_N + j] = i * 2.0 * M_PI / (2. * L);
+=======
+      kx[i * P + j] = i * 2.0 * M_PI / (2. * L);
+>>>>>>> 31e3fb0 (-)
     }    
     //for (int j = N / 2; j < N; j++)
     //{
-    //  kx[i * N + j] = (i - N) * 2 * M_PI / L;
+    //  kx[i * P + j] = (i - N) * 2 * M_PI / L;
     //}
   }
   
@@ -82,16 +106,24 @@ void geometry(double * x, double * y, double * kx, double * ky, double * k2)
   {    
     for (int i = 0; i < padded_N; i++)
     {
+<<<<<<< HEAD
       ky[i * padded_N + j] = j * 2.0 * M_PI / (2. * L);
+=======
+      ky[i * P + j] = j * 2.0 * M_PI / (2. * L);
+>>>>>>> 31e3fb0 (-)
     }    
     //for (int i = N / 2; i < N; i++)
     //{
-    //  ky[i * N + j] = (j - N) * 2.0 * M_PI / L;
+    //  ky[i * P + j] = (j - N) * 2.0 * M_PI / L;
     //}
   }
 
   #pragma omp parallel for
+<<<<<<< HEAD
   for (int i = 0; i < padded_N * padded_N; i++)
+=======
+  for (int i = 0; i < P * P; i++)
+>>>>>>> 31e3fb0 (-)
   {    
     k2[i] = kx[i] * kx[i] + ky[i] * ky[i];
   }  
@@ -102,9 +134,14 @@ void potential_V(double * x, double * y, double * k2, double * V, const char * n
   if ( name == "GEM2")
   {
     #pragma omp parallel for
-    for (int i = 0; i < N * N; i++)
+    for (int i = 0; i < N; i++)
     {
-      V[i] = U * exp(-x[i] * x[i] - y[i] * y[i]);
+      for (int j = 0; j < N; j++)
+      {
+        double xx = x[i * P + j] * x[i * P + j];
+        double yy = y[i * P + j] * y[i * P + j];
+        V[i * P + j] = U * exp( -xx - yy );
+      }
     }
   }
   if ( name == "Rydberg")
@@ -166,7 +203,7 @@ void potential_V(double * x, double * y, double * k2, double * V, const char * n
     printer_field_transversal_view(x, y, V, "fftV.dat");
     fftw_plan p = fftw_plan_r2r_2d(N, N, V, V, FFTW_REDFT00, FFTW_REDFT00, FFTW_MEASURE);
     fftw_destroy_plan(p);
-      #pragma omp parallel for
+    #pragma omp parallel for
     for (int i = 0; i < N * N; i++)
     {
       V[i] *= dkx * dky;
@@ -211,25 +248,86 @@ void potential_V(double * x, double * y, double * k2, double * V, const char * n
   }  
 }
 
-void compute_omega(fftw_plan omega_to_omega, double * k2, double * S, double * omega)
+void compute_omega(fftw_plan p_omega, double * k2, double * S, double * omega)
 {
   double c = - dkx * dky * ( 1.0 / (2. * M_PI * 2.0 * M_PI * rho) ) * 0.25;
   #pragma omp parallel for 
+<<<<<<< HEAD
   for (int i = 0; i < padded_N * padded_N; i++)
+=======
+  for (int i = 0; i < P; i++)
   {
-    double aux = ( 1. - (1. / S[i]) );
-    omega[i] = c * k2[i] * ( 2. * S[i] + 1. ) * aux * aux; 
+    for (int j = 0; j < P; j++)
+    {
+      if (i >= N || j >= N)
+      {
+        omega[i * P + j] = 0;  
+      }
+      else
+      {
+        double aux = ( 1. - (1. / (S[i * P + j])) );
+        omega[i * P + j] = c * k2[i * P + j] * ( 2. * S[i * P + j] + 1. ) * aux * aux; 
+      }
+
+    }
   }  
-  fftw_execute(omega_to_omega);
+  fftw_execute(p_omega);
+}
+
+void compute_second_step(fftw_plan p_S, fftw_plan p_omega, double * k2, double * S, double * g, double * omega, double * V)
+{
+  double alpha = 1;//(double)(P - 1) / (double)(N - 1);
+  double c = rho * dx * dy * alpha * alpha;
+  #pragma omp parallel for 
+  for (int i = 0; i < P; i++)
+  {
+    for (int j = 0; j < P; j++)
+    {
+      if (i >= N || j >= N)
+      {
+        S[i * P + j] = 0;
+      }
+      else
+      {
+        S[i * P + j] = c * (g[i * P + j] * g[i * P + j] - 1.0);
+      } 
+    }
+  }
+  fftw_execute(p_S);
+  #pragma omp parallel for 
+  for (int i = 0; i < P; i++)
+  {
+    for (int j = 0; j < P; j++)
+    {
+      if (i >= N || j >= N)
+      {
+        S[i * P + j] = 0;
+      }
+      else
+      {
+        S[i * P + j] += 1.0;
+      } 
+    }
+  }
+  compute_omega(p_omega, k2, S, omega);
+  #pragma omp parallel for
+  for (int i = 0; i < N * N; i++)
+>>>>>>> 31e3fb0 (-)
+  {
+    g[i] *= exp(-(V[i] + omega[i]) * dt);
+  }
 }
 
 void initialize_g_S(double * x, double * y, double * g, double * S)
 {
   #pragma omp parallel for
-  for (int i = 0; i < N * N; i++)
+  for (int i = 0; i < N; i++)
   {
-    S[i] = 1.0;// - exp(-x[i] * x[i] - y[i] * y[i]);
-    g[i] = S[i];
+    for (int j = 0; j < N; j++)
+    {
+      S[i * P + j] = 1.0;// - exp(-x[i] * x[i] - y[i] * y[i]);
+      g[i * P + j] = 1.0;
+    }
   }
   return;  
 }
@@ -238,7 +336,7 @@ double compute_g_error(double * new_g, double * g)
 {
   double sum, tmp= 0;
   #pragma omp parallel for reduction(+ : sum) private(tmp)
-  for (int i = 0; i < N * N; i++)
+  for (int i = 0; i < P * P; i++)
   {
     tmp = abs(new_g[i] - g[i]); 
     sum += tmp; 
@@ -250,7 +348,7 @@ double compute_S_error(double * new_S, double * S)
 {
   double sum, tmp= 0;
   #pragma omp parallel for reduction(+ : sum) private(tmp)
-  for (int i = 0; i < N * N; i++)
+  for (int i = 0; i < P * P; i++)
   {
     tmp = abs(new_S[i] - S[i]); 
     sum += tmp; 
@@ -265,11 +363,11 @@ void compute_Vph(double * V, double * g, double * omega, double * Vph)
   {
     for (int j = 0; j < N - 4; j++)
     {
-      Vph[i * N + j] = g[i * N + j] * V[i * N + j];
-      double dely_g = 2. * g[i * N + j + 3] - 9. * g[i * N + j + 2] + 18. * g[i * N + j + 1] - 11. * g[i * N + j];
-      double delx_g = 2. * g[(i + 3) * N + j] - 9. * g[(i + 2) * N + j] + 18. * g[(i + 1) * N + j] - 11. * g[i * N + j];
-      Vph[i * N + j] += (delx_g * delx_g + dely_g * dely_g) / (6. * dx * 6. * dx * 4. * g[i * N + j]);
-      Vph[i * N + j] += (  g[i * N + j] - 1.  ) * omega[i * N + j];
+      Vph[i * P + j] = g[i * P + j] * V[i * P + j];
+      double dely_g = 2. * g[i * P + j + 3] - 9. * g[i * P + j + 2] + 18. * g[i * P + j + 1] - 11. * g[i * P + j];
+      double delx_g = 2. * g[(i + 3) * P + j] - 9. * g[(i + 2) * P + j] + 18. * g[(i + 1) * P + j] - 11. * g[i * P + j];
+      Vph[i * P + j] += (delx_g * delx_g + dely_g * dely_g) / (6. * dx * 6. * dx * 4. * g[i * P + j]);
+      Vph[i * P + j] += (  g[i * P + j] - 1.  ) * omega[i * P + j];
     } 
   }   
   return;
@@ -277,14 +375,29 @@ void compute_Vph(double * V, double * g, double * omega, double * Vph)
 
 void update_S(fftw_plan Vph_to_Vph, double * k2, double * Vph, double * S)
 {
-  double c = rho * dx * dy;
+  double alpha = 1;//(double)(P - 1) / (double)(N - 1);
+  double c = rho * dx * dy * alpha * alpha;
   fftw_execute(Vph_to_Vph);
   #pragma omp parallel for 
+<<<<<<< HEAD
   for (int i = 0; i < padded_N * padded_N; i++)
+=======
+  for (int i = 0; i < P; i++)
+>>>>>>> 31e3fb0 (-)
   {
-    Vph[i] *= c;
-    double dS = sqrt( k2[i] / ( k2[i] + 4. * Vph[i] ) );
-    S[i] = (1. - dt) * S[i] + dt * dS; 
+    for (int j = 0; j < P; j++)
+    {
+      if (i >= N || j >= N)
+      {
+        S[i * P + j] = 0;
+      }
+      else
+      {
+        Vph[i * P + j] *= c;
+        double dS = sqrt( k2[i * P + j] / ( k2[i * P + j] + 4. * Vph[i * P + j]) ) ;
+        S[i * P + j] = (1. - dt) * S[i * P + j] + dt * dS;
+      } 
+    }
   } 
   return;
 }
@@ -293,16 +406,45 @@ void compute_g(fftw_plan g_to_g, double * S, double * g)
 {
   double c = dkx * dky / (2. * M_PI * 2. * M_PI * rho);
   #pragma omp parallel for 
+<<<<<<< HEAD
   for (int i = 0; i < padded_N * padded_N; i++)
+=======
+  for (int i = 0; i < P; i++)
+>>>>>>> 31e3fb0 (-)
   {
-    g[i] = S[i] - 1.; 
+    for (int j = 0; j < P; j++)
+    {
+      if (i >= N || j >= N)
+      {
+        g[i * P + j] = 0;
+      }
+      else
+      {
+        g[i * P + j] = S[i * P + j] - 1.0; 
+      }
+    }
   }
   fftw_execute(g_to_g);
   #pragma omp parallel for 
+<<<<<<< HEAD
   for (int i = 0; i < padded_N * padded_N; i++)
+=======
+  for (int i = 0; i < P; i++)
+>>>>>>> 31e3fb0 (-)
   {
-    g[i] = 1. + c * g[i];
+    for (int j = 0; j < P; j++)
+    {
+      if (i >= N || j >= N)
+      {
+        g[i * P + j] = 0;
+      }
+      else
+      {
+        g[i * P + j] = 1. + c * g[i * P + j]; 
+      }
+    }
   } 
+<<<<<<< HEAD
   double * aux = (double *)fftw_malloc(sizeof(double) * N * N);
   #pragma omp parallel for 
   for (int i = 0; i < N; i++)
@@ -315,24 +457,40 @@ void compute_g(fftw_plan g_to_g, double * S, double * g)
   memset(g, 0, sizeof(double) * padded_N * padded_N);
   memcpy(g, aux, N * N * sizeof(double));
   fftw_free(aux);
+=======
+>>>>>>> 31e3fb0 (-)
 }
 
 double compute_energy(double * k2, double * g, double * S, double * V)
 {
+<<<<<<< HEAD
   double alpha = (double)(padded_N - 1) / (double)(N - 1);
+=======
+  double alpha = (double)(P - 1) / (double)(N - 1);
+>>>>>>> 31e3fb0 (-)
   double c1 = (rho / 2.) * dx * dy * alpha * alpha;
   double c2 = - (1. / 8.) * ( 1. / (2. * M_PI * 2. * M_PI * rho) ) * dkx * dky;
   double c3 = - (rho / 2.) * 0.25;
   double sum, tmp = 0;
   #pragma omp parallel for reduction(+ : sum) private(tmp)
-  for (int i = 0; i < N - 2; i++)
+  for (int i = 0; i < N - 4; i++)
   {
-    for (int j = 0; j < N - 2; j++)
+    for (int j = 0; j < N - 4; j++)
     {
-      double aux = S[i * N + j] - 1.;
-      tmp = c1 * V[i * N + j] * g[i * N + j] + c2 * k2[i * N + j] * aux * aux * aux / S[i * N + j];
-      tmp += c3 * g[i * N + j] * ( log(g[i * N + j + 2]) - 2. * log(g[i * N + j + 1]) + log(g[i * N + j]) ); // delyy_g
-      tmp += c3 * g[i * N + j] * ( log(g[(i + 2) * N + j]) - 2. * log(g[(i + 1) * N + j]) + log(g[(i) * N + j]) ); // delxx_g
+      double aux = S[i * P + j] - 1.;
+      tmp = c1 * V[i * P + j] * g[i * P + j];
+      double second_term = 0;
+      if(i == 0 || j == 0)
+      {
+        second_term = 0;
+      }
+      else
+      {
+        second_term = c2 * k2[i * P + j] * aux * aux * aux / (S[i * P + j]);
+      }
+      tmp += second_term;
+      tmp += c3 * g[i * P + j] * ( log(g[i * P + j + 2]) - 2. * log(g[i * P + j + 1]) + log(g[i * P + j]) ); // delyy_g
+      tmp += c3 * g[i * P + j] * ( log(g[(i + 2) * P + j]) - 2. * log(g[(i + 1) * P + j]) + log(g[(i) * P + j]) ); // delxx_g
 
       sum += tmp;
     } 
@@ -434,6 +592,28 @@ void compute_part1(double * expAx,
   fftw_execute(p_y);
 }
 
+void compute_kinetic(double * expAx, 
+                    double * expAy, 
+                    double * g,
+                    fftw_plan p_x, 
+                    fftw_plan p_y)
+{
+  fftw_execute(p_x);
+  #pragma omp parallel for
+  for(int i = 0; i < N * N; i++)
+  {
+    g[i] *= expAx[i];
+  }  
+  fftw_execute(p_x);
+  fftw_execute(p_y);
+  #pragma omp parallel for
+  for(int i = 0; i < N * N; i++)
+  {
+    g[i] *= expAy[i];
+  }  
+  fftw_execute(p_y);
+}
+
 void normalize_f(double * f)
 {
   double sum, tmp = 0;
@@ -449,6 +629,24 @@ void normalize_f(double * f)
   for(int i = 0; i < N * N; i++)
   {
     f[i] /= sum;
+  }
+}
+
+void normalize_g(double * g)
+{
+  double sum, tmp = 0;
+  #pragma omp parallel for reduction(+ : sum) private(tmp)
+  for(int i = 0; i < N * N; i++)
+  {
+    tmp = g[i] * g[i];
+    sum += tmp;
+  }
+  sum *= dx * dy;
+  sum = sqrt(sum);
+  #pragma omp parallel for
+  for(int i = 0; i < N * N; i++)
+  {
+    g[i] /= sum;
   }
 }
 
@@ -503,10 +701,15 @@ void printer_loop_f(long int counter, double * k2, double * g, double * f, doubl
 
 void print_loop(double * x, double * y, double * k2, double * g, double * V, double * S, double * new_S, long int counter)
 {
+<<<<<<< HEAD
   if(counter%1 == 0 or counter == 1)
+=======
+  if(counter%200 == 0 or counter == 1)
+>>>>>>> 31e3fb0 (-)
   {
     new_energy = compute_energy(k2, g, new_S, V);
     double error = abs(new_energy - energy) / dt;
+    //double error = compute_S_error(new_S, S); 
     bool aux_condition = error > tolerance;
     printf("t = %ld, de/dt = %1.4e, e = %1.6f\n", counter, error, new_energy);
     if(counter > 1)
@@ -516,7 +719,11 @@ void print_loop(double * x, double * y, double * k2, double * g, double * V, dou
       //printer_field(x, y, g, "g.dat");
       //printer_field(x, y, S, "S.dat");
     }
+<<<<<<< HEAD
     memcpy(new_S, S, N * N * sizeof(double));
+=======
+    memcpy(new_S, S, P * P * sizeof(double));
+>>>>>>> 31e3fb0 (-)
     energy = new_energy;
     condition = aux_condition;
   }
@@ -589,6 +796,32 @@ void preliminaries(double * k2,
   fftw_destroy_plan(sqrt_g_to_sqrt_g);
   fftw_destroy_plan(p_Wx);
   fftw_destroy_plan(p_Wy);
+}
+
+void preliminaries_TSSP(double * expAx, double * expAy)
+{
+
+  double p = dkx; 
+  //Operator in the x-direction
+  #pragma omp parallel for
+  for (int j = 0; j < N; j++)
+  {
+    for (int i = 0; i < N; i++)
+    {
+      double temp = (   pow(p * i, 2.0)   ) * dt / 2.0;
+      expAx[i * N + j] = exp(-temp) / (2.0 * ((double)N - 1.));
+    }    
+  }
+
+  //Operator in the y-direction
+  for (int i = 0; i < N; i++)
+  {    
+    for (int j = 0; j < N; j++)
+    {
+      double temp = (  pow(p * j, 2)  ) * dt / 2.0;
+      expAy[i * N + j] = exp(-temp) / (2.0 * ((double)N - 1.));
+    }    
+  } 
 }
 
 #endif
