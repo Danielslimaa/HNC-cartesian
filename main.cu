@@ -55,11 +55,22 @@ int main(void){
   {
     h_U[i] = exp( -x[i] * x[i] - y[i] * y[i] );
   }  
-
   cudaMemcpy(U, h_U, sizeof(double) * h_N * h_N, cudaMemcpyHostToDevice);
-
   printer_vector(x, y, U, "U.dat", h_N);  
-  
+
+  const int numStreams = N; // Number of CUDA streams
+  // Allocate memory for the array of streams
+  cudaStream_t* streams_y = new cudaStream_t[numStreams];
+  cudaStream_t* streams_x = new cudaStream_t[numStreams];
+
+  // Create each stream
+  for (int i = 0; i < numStreams; ++i) 
+  {
+    CUDA_CHECK(cudaStreamCreate(&streams_y[i]));
+    CUDA_CHECK(cudaStreamCreate(&streams_x[i]));
+  }  
+
+
   dim3 threadsPerBlock(h_N, h_N);
   dim3 numBlocks(N / threadsPerBlock.x, N / threadsPerBlock.y);
   DCT_x<<<numBlocks, threadsPerBlock>>>(U, U);
@@ -68,11 +79,20 @@ int main(void){
   DCT_x<<<numBlocks, threadsPerBlock>>>(U, U);
   DCT_y<<<numBlocks, threadsPerBlock>>>(U, U);
   rescaling<<<Blocks_N, ThreadsPerBlock_N>>>(U);
-  printer_vector(x, y, U, "IFFT_FFT_U.dat", h_N);  
+  printer_vector(x, y, U, "IFFT_FFT_U.dat", h_N);                              
+
+  // Synchronize and destroy each stream
+  for (int i = 0; i < numStreams; ++i) 
+  {
+    CUDA_CHECK(cudaStreamDestroy(streams_y[i]));
+    CUDA_CHECK(cudaStreamDestroy(streams_x[i]));
+  }
 
   cudaDeviceReset();
   delete[] x;
   delete[] y;
   delete[] h_U;
+  delete[] streams_y;
+  delete[] streams_x;
   return 0;
 }

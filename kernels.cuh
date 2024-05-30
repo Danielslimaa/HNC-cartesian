@@ -7,6 +7,13 @@
 
 #define PI M_PI
 
+// Check for CUDA errors
+#define CUDA_CHECK(err) \
+    if (err != cudaSuccess) { \
+        std::cerr << "CUDA Error: " << cudaGetErrorString(err) << std::endl; \
+        exit(EXIT_FAILURE); \
+    }
+
 __constant__ int N;
 __constant__ double h;
 __constant__ double L;
