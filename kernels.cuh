@@ -18,6 +18,10 @@ __constant__ int N;
 __constant__ double h;
 __constant__ double L;
 __constant__ double rho;
+__constant__ double dx;
+__constant__ double dy;
+__constant__ double dkx;
+__constant__ double dky;
 
 #if __CUDA_ARCH__ < 600
 __device__ double atomicAdd_double(double* address, double val)
@@ -157,9 +161,8 @@ __global__ void DCT_y(
 
 void printer_vector(double * x, double * y, double *vetor, const char *name, int h_N)
 {
-    double * h_vetor = new double[h_N * h_N];
-
-    cudaMemcpy(h_vetor, vetor, sizeof(double) * h_N * h_N, cudaMemcpyDeviceToHost);
+	double * h_vetor = new double[h_N * h_N];
+	cudaMemcpy(h_vetor, vetor, sizeof(double) * h_N * h_N, cudaMemcpyDeviceToHost);
 	std::ofstream myfile;
 	myfile.open(name);
 	for (int i = 0; i < h_N * h_N; ++i)
@@ -168,7 +171,7 @@ void printer_vector(double * x, double * y, double *vetor, const char *name, int
         //std::cout << h_x[i] << "," << h_y[i] << "," << h_vetor[i] << std::endl;
 	}
 	myfile.close();
-    delete[] h_vetor;
+	delete[] h_vetor;
 	return;
 }
 
@@ -200,6 +203,7 @@ __global__ void rescaling(double * U)
     }
 }
 
+/*
 __global__ void g_from_S3(
 	double *__restrict__ g,
 	const double *__restrict__ S,
@@ -245,11 +249,10 @@ __global__ void g_from_S3(
 		g[tid] = g[tid] * exp(dt * (1.0 + (y_val * dk * dk / (2.0 * M_PI * rho)) - g[tid]));
 	}
 }
-
+*/
 __global__ void ifft_cossine_x_integral(
 	double *__restrict__ g,
 	const double *__restrict__ S,
-	double *sum_diff_g
   int d_column)
 {
   int j = d_column;
@@ -262,7 +265,7 @@ __global__ void ifft_cossine_x_integral(
 	{
 		if ((m * BLOCK_SIZE + threadIdx.x) < N)
 		{
-			x_shfl_src = S[(threadIdx.x + m * BLOCK_SIZE) * N + j] - 1.0;
+			x_shfl_src = S[(threadIdx.x + m * BLOCK_SIZE) * N + j];// - 1.0;
 		}
 		else
 		{
@@ -270,7 +273,7 @@ __global__ void ifft_cossine_x_integral(
 		}
 		__syncthreads();
 
-		//        #pragma unroll
+		//#pragma unroll
 		for (int e = 0; e < 32; ++e)
 		{
 			// --- Column-major ordering - faster
@@ -293,7 +296,6 @@ __global__ void ifft_cossine_x_integral(
 __global__ void ifft_cossine_y_integral(
 	double *__restrict__ g,
 	const double *__restrict__ S,
-	double *sum_diff_g
   int d_row)
 {
   int i = d_row;
@@ -306,7 +308,7 @@ __global__ void ifft_cossine_y_integral(
 	{
 		if ((m * BLOCK_SIZE + threadIdx.y) < N)
 		{
-			x_shfl_src = g[i * N + (threadIdy.y + m * BLOCK_SIZE)];
+			x_shfl_src = g[i * N + (threadIdx.y + m * BLOCK_SIZE)];
 		}
 		else
 		{
@@ -326,17 +328,15 @@ __global__ void ifft_cossine_y_integral(
 		}
 		__syncthreads();
 	}
-
 	if (tid < N)
 	{
-		g[tid] = 1.0 + (y_val * dkx * dky / (2.0 * M_PI * 2.0 * M_PI * rho));
+		g[tid] = (y_val * dkx * dky / (2.0 * M_PI * 2.0 * M_PI * rho));
 	}
 }
 
 __global__ void fft_cossine_x_integral(
-	double *__restrict__ g,
-	const double *__restrict__ S,
-	double *sum_diff_g
+	const double *__restrict__ g,
+	double *__restrict__ S,
   int d_column)
 {
   int j = d_column;
@@ -348,7 +348,7 @@ __global__ void fft_cossine_x_integral(
 	{
 		if ((m * BLOCK_SIZE + threadIdx.x) < N)
 		{
-			x_shfl_src = g[(threadIdx.x + m * BLOCK_SIZE) * N + j] - 1.0;
+			x_shfl_src = g[(threadIdx.x + m * BLOCK_SIZE) * N + j];// - 1.0;
 		}
 		else
 		{
@@ -362,7 +362,7 @@ __global__ void fft_cossine_x_integral(
 			// --- Column-major ordering - faster
 			x_shfl_dest = __shfl_sync(0xffffffff, x_shfl_src, e);
 			// y_val += d_j0table[tid * nCols + (e + BLOCK_SIZE * m)] * x_shfl_dest;
-			y_val += cos(double(tid) * dx * double(e + BLOCK_SIZE * m) * dky) * x_shfl_dest;
+			y_val += cos(double(tid) * dx * double(e + BLOCK_SIZE * m) * dkx) * x_shfl_dest;
 			// --- Row-major ordering - slower
 			// y_val += d_V_ph_k[tid * nCols + (e + BLOCK_SIZE * m)] * x_shared[e];
 		}
@@ -376,9 +376,8 @@ __global__ void fft_cossine_x_integral(
 }
 
 __global__ void fft_cossine_y_integral(
-	double *__restrict__ g,
-	const double *__restrict__ S,
-	double *sum_diff_g
+	const double *__restrict__ g,
+	double *__restrict__ S,
   int d_row)
 {
   int i = d_row;
@@ -390,7 +389,7 @@ __global__ void fft_cossine_y_integral(
 	{
 		if ((m * BLOCK_SIZE + threadIdx.y) < N)
 		{
-			x_shfl_src = S[i * N + (threadIdy.y + m * BLOCK_SIZE)];
+			x_shfl_src = S[i * N + (threadIdx.y + m * BLOCK_SIZE)];
 		}
 		else
 		{
@@ -398,7 +397,7 @@ __global__ void fft_cossine_y_integral(
 		}
 		__syncthreads();
 
-		//        #pragma unroll
+		//#pragma unroll
 		for (int e = 0; e < 32; ++e)
 		{
 			// --- Column-major ordering - faster
@@ -413,6 +412,6 @@ __global__ void fft_cossine_y_integral(
 
 	if (tid < N)
 	{
-		S[tid] = 1.0 + rho * dx * dy * y_val;
+		S[tid] = rho * dx * dy * y_val;
 	}
 }
