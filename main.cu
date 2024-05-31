@@ -47,10 +47,13 @@ int main(void){
 
   printf("numBlocks = (%d, %d)\n", h_N / threadsPerBlock.x, h_N / threadsPerBlock.y);
 
-  double * U, * g, * S;
-  cudaMalloc(&U, sizeof(double) * h_N * h_N);
-  cudaMalloc(&S, sizeof(double) * h_N * h_N);
+  double * V, * g, * S, *new_S, * omega, * VPh;
+  cudaMalloc(&V, sizeof(double) * h_N * h_N);
   cudaMalloc(&g, sizeof(double) * h_N * h_N);
+  cudaMalloc(&S, sizeof(double) * h_N * h_N);
+  cudaMalloc(&new_S, sizeof(double) * h_N * h_N);
+  cudaMalloc(&omega, sizeof(double) * h_N * h_N);
+  cudaMalloc(&Vph, sizeof(double) * h_N * h_N);
 
   double * x = new double[h_N * h_N];
   double * y = new double[h_N * h_N];
@@ -96,8 +99,11 @@ int main(void){
   }  
   printf("Streams created.\n");
   
-  FFT(g, S, streams_x, streams_y, numBlocks, threadsPerBlock);
 
+
+  FFT_g2S(g, S, streams_x, streams_y, numBlocks, threadsPerBlock);
+
+  
 
   printer_vector(x, y, g, "g2.dat", h_N);
   // Destroy each stream
@@ -107,15 +113,18 @@ int main(void){
     CUDA_CHECK(cudaStreamDestroy(streams_y[i]));
     CUDA_CHECK(cudaStreamDestroy(streams_x[i]));
   }
+  delete[] streams_y;
+  delete[] streams_x;
   
   delete[] x;
   delete[] y;
   delete[] h_U;
+  cudaFree(V);
   cudaFree(g);
   cudaFree(S);
-  cudaFree(index);
-  delete[] streams_y;
-  delete[] streams_x;
+  cudaFree(new_S);
+  cudaFree(omega);
+  cudaFree(Vph);
   cudaDeviceReset();
   return 0;
 }
