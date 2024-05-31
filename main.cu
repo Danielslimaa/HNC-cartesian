@@ -10,7 +10,7 @@
 #include "kernels.cuh"
 
 int main(void){
-  int h_N = 1 << 8;
+  h_N = 1 << 8;
   double h_L = 5;
   double h_h = h_L / h_N;
   double h_rho = 1;
@@ -83,10 +83,10 @@ int main(void){
 
   printer_vector(x, y, g, "g0.dat", h_N);
 
-  const int numStreams = h_N; // Number of CUDA streams
+  numStreams = h_N; // Number of CUDA streams
   // Allocate memory for the array of streams
-  cudaStream_t* streams_y = new cudaStream_t[numStreams];
-  cudaStream_t* streams_x = new cudaStream_t[numStreams];
+  cudaStream_t * streams_y = new cudaStream_t[numStreams];
+  cudaStream_t * streams_x = new cudaStream_t[numStreams];
   // Create each stream
   printf("Create each stream\n");
   for (int i = 0; i < numStreams; ++i) 
@@ -96,60 +96,9 @@ int main(void){
   }  
   printf("Streams created.\n");
   
-  int * h_index = new int[h_N];
-  int * index;
-  cudaMalloc(&index, sizeof(int) * h_N);
-  for (int i = 0; i < h_N; i++)
-  {
-    h_index[i] = i;
-  }  
-  cudaMemcpy(index, h_index, sizeof(int) * h_N, cudaMemcpyHostToDevice);
-  delete[] h_index;
+  FFT(g, S, streams_x, streams_y, numBlocks, threadsPerBlock);
 
-  printf("Tests\n");
-  #pragma unroll
-  for (int i = 0; i < h_N; i++)
-  {
-    fft_cossine_x_integral<<<numBlocks, threadsPerBlock, 0, streams_x[i]>>>(g, S, i);
-  }
-  #pragma unroll
-  for (int i = 0; i < h_N; i++) 
-  {
-    CUDA_CHECK(cudaStreamSynchronize(streams_x[i]));
-  }  
-  #pragma unroll
-  for (int i = 0; i < h_N; i++)
-  {
-    fft_cossine_y_integral<<<numBlocks, threadsPerBlock, 0, streams_y[i]>>>(g, S, i);
-  }  
-  #pragma unroll
-  for (int i = 0; i < h_N; i++) 
-  {
-    CUDA_CHECK(cudaStreamSynchronize(streams_y[i]));
-  }
-  
-  printer_vector(x, y, S, "g1.dat", h_N);
 
-  #pragma unroll
-  for (int i = 0; i < h_N; i++)
-  {
-    ifft_cossine_x_integral<<<numBlocks, threadsPerBlock, 0, streams_x[i]>>>(g, S, i);
-  }
-  #pragma unroll
-  for (int i = 0; i < h_N; i++) 
-  {
-    CUDA_CHECK(cudaStreamSynchronize(streams_x[i]));
-  }
-  #pragma unroll
-  for (int i = 0; i < h_N; i++)
-  {
-    ifft_cossine_y_integral<<<numBlocks, threadsPerBlock, 0, streams_y[i]>>>(g, S, i);
-  }
-  #pragma unroll
-  for (int i = 0; i < h_N; i++) 
-  {
-    CUDA_CHECK(cudaStreamSynchronize(streams_y[i]));
-  }
   printer_vector(x, y, g, "g2.dat", h_N);
   // Destroy each stream
   printf("Destroy each stream\n");
