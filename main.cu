@@ -47,7 +47,7 @@ int main(void){
 
   printf("numBlocks = (%d, %d)\n", h_N / threadsPerBlock.x, h_N / threadsPerBlock.y);
 
-  double * V, * g, * S, *new_S, * omega, * VPh;
+  double * V, * g, * S, *new_S, * omega, * Vph;
   cudaMalloc(&V, sizeof(double) * h_N * h_N);
   cudaMalloc(&g, sizeof(double) * h_N * h_N);
   cudaMalloc(&S, sizeof(double) * h_N * h_N);
@@ -72,17 +72,17 @@ int main(void){
     }
   }
 
-  double * h_U = new double[h_N * h_N];
+  double * h_V = new double[h_N * h_N];
   #pragma omp parallel for
   for (int i = 0; i < h_N * h_N; i++)
   {
-    h_U[i] = exp( -x[i] * x[i] - y[i] * y[i] );
+    h_V[i] = exp( -x[i] * x[i] - y[i] * y[i] );
   }  
-  cudaMemcpy(U, h_U, sizeof(double) * h_N * h_N, cudaMemcpyHostToDevice);
-  printer_vector(x, y, U, "U.dat", h_N);  
+  cudaMemcpy(V, h_V, sizeof(double) * h_N * h_N, cudaMemcpyHostToDevice);
+  printer_vector(x, y, V, "U.dat", h_N);  
 
-  cudaMemcpy(g, h_U, sizeof(double) * h_N * h_N, cudaMemcpyHostToDevice);
-  cudaMemcpy(S, h_U, sizeof(double) * h_N * h_N, cudaMemcpyHostToDevice);
+  cudaMemcpy(g, h_V, sizeof(double) * h_N * h_N, cudaMemcpyHostToDevice);
+  cudaMemcpy(S, h_V, sizeof(double) * h_N * h_N, cudaMemcpyHostToDevice);
 
   printer_vector(x, y, g, "g0.dat", h_N);
 
@@ -118,7 +118,7 @@ int main(void){
   
   delete[] x;
   delete[] y;
-  delete[] h_U;
+  delete[] h_V;
   cudaFree(V);
   cudaFree(g);
   cudaFree(S);

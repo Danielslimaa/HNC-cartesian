@@ -22,8 +22,8 @@ __constant__ double dx;
 __constant__ double dy;
 __constant__ double dkx;
 __constant__ double dky;
-const int numStreams;
-const int h_N;
+int numStreams;
+int h_N;
 
 #if __CUDA_ARCH__ < 600
 __device__ double atomicAdd_double(double* address, double val)
@@ -523,7 +523,7 @@ __global__ void fft_Vph_x_integral(
 		{
 			double aux1 = g[(threadIdx.x + m * BLOCK_SIZE) * N + j] * V[(threadIdx.x + m * BLOCK_SIZE) * N + j];
 			double aux2 = grad_sqrt_g[(threadIdx.x + m * BLOCK_SIZE) * N + j];
-			double aux3 = (g[(threadIdx.x + m * BLOCK_SIZE) * N + j] - 1.0) * omega[(threadIdx.x + m * BLOCK_SIZE) * N + j]
+			double aux3 = (g[(threadIdx.x + m * BLOCK_SIZE) * N + j] - 1.0) * omega[(threadIdx.x + m * BLOCK_SIZE) * N + j];
 			x_shfl_src = aux1 + aux2 + aux3;
 		}
 		else

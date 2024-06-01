@@ -1,0 +1,2 @@
+nsys profile --output=system_profile_report ./a.out
+nsys-ui
