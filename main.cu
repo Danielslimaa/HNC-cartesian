@@ -101,8 +101,6 @@ int main(void){
   
 
 
-  FFT_g2S(g, S, streams_x, streams_y, numBlocks, threadsPerBlock);
-
   
 
   printer_vector(x, y, g, "g2.dat", h_N);

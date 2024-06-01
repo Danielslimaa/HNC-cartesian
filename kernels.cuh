@@ -594,7 +594,6 @@ __global__ void fft_Vph_y_integral(
 
 void FFT_g2S(const double * g, double * S, cudaStream_t * streams_x, cudaStream_t * streams_y, dim3 numBlocks, dim3 threadsPerBlock)
 {
-  printf("Tests\n");
   #pragma unroll
   for (int i = 0; i < h_N; i++)
   {
@@ -617,3 +616,7 @@ void FFT_g2S(const double * g, double * S, cudaStream_t * streams_x, cudaStream_
   }
 }
 
+void compute_second_term(double * g, double * second_term, dim3 numBlocks, dim3 threadsPerBlock)
+{
+	
+}
