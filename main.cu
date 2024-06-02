@@ -47,13 +47,14 @@ int main(void){
 
   printf("numBlocks = (%d, %d)\n", h_N / threadsPerBlock.x, h_N / threadsPerBlock.y);
 
-  double * V, * g, * S, *new_S, * omega, * Vph;
+  double * V, * g, * S, *new_S, * omega, * Vph, * second_term;
   cudaMalloc(&V, sizeof(double) * h_N * h_N);
   cudaMalloc(&g, sizeof(double) * h_N * h_N);
   cudaMalloc(&S, sizeof(double) * h_N * h_N);
   cudaMalloc(&new_S, sizeof(double) * h_N * h_N);
   cudaMalloc(&omega, sizeof(double) * h_N * h_N);
   cudaMalloc(&Vph, sizeof(double) * h_N * h_N);
+  cudaMalloc(&second_term, sizeof(double) * h_N * h_N);
 
   double * x = new double[h_N * h_N];
   double * y = new double[h_N * h_N];
@@ -101,7 +102,7 @@ int main(void){
   
 
 
-  
+
 
   printer_vector(x, y, g, "g2.dat", h_N);
   // Destroy each stream
@@ -123,6 +124,7 @@ int main(void){
   cudaFree(new_S);
   cudaFree(omega);
   cudaFree(Vph);
+  cudaFree(second_term);
   cudaDeviceReset();
   return 0;
 }
