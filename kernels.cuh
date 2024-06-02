@@ -592,6 +592,23 @@ __global__ void fft_Vph_y_integral(
 	}
 }
 
+__global__ void kernel_compute_second_term(double * g, double * second_term)
+{
+	double c1 = 0.25 / (60. * dx * 60. * dx);
+	double c2 = 0.25 / (60. * dy * 60. * dy);
+	for (int i = blockIdx.x * blockDim.x + threadIdx.x;  i < N; i += blockDim.x * gridDim.x)
+	{
+		for (int j = blockIdx.y * blockDim.y + threadIdx.y;  j < N; j += blockDim.y * gridDim.y)
+		{
+			double grad_x = -147. * g[i * N + j] + 360. * g[(i + 1) * N + j] - 450. * g[(i + 2) * N + j] + 400 * g[(i + 3)* N + j];
+			grad_x += -225. * g[(i + 4) * N + j] + 72. * g[(i + 5) * N + j] - 10. * g[(i + 6) * N + j];
+			double grad_y = -147. * g[i * N + j] + 360. * g[i * N + j + 1] - 450. * g[i * N + j + 2] + 400 * g[i * N + j + 3];
+			grad_y += -225. * g[i * N + j + 4] + 72. * g[i * N + j + 5] - 10. * g[i * N + j + 6];		   
+			second_term[i * N + j] = (c1 * grad_x * grad_x + c2 * grad_y * grad_y) / (g[i * N + j]);
+		}
+	}
+}
+
 void FFT_g2S(const double * g, double * S, cudaStream_t * streams_x, cudaStream_t * streams_y, dim3 numBlocks, dim3 threadsPerBlock)
 {
   #pragma unroll
@@ -618,5 +635,6 @@ void FFT_g2S(const double * g, double * S, cudaStream_t * streams_x, cudaStream_
 
 void compute_second_term(double * g, double * second_term, dim3 numBlocks, dim3 threadsPerBlock)
 {
-	
+	kernel_compute_second_term<<<numBlocks, threadsPerBlock>>>(g, second_term);
+
 }
