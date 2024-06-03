@@ -9,7 +9,8 @@
 #include <omp.h>
 #include "kernels.cuh"
 
-int main(void){
+int main(void)
+{
   h_N = 1 << 8;
   double h_L = 5;
   double h_h = h_L / h_N;
@@ -47,7 +48,8 @@ int main(void){
 
   printf("numBlocks = (%d, %d)\n", h_N / threadsPerBlock.x, h_N / threadsPerBlock.y);
 
-  double * V, * g, * S, *new_S, * omega, * Vph, * second_term;
+  double * k2, * V, * g, * S, *new_S, * omega, * Vph, * second_term;
+  cudaMalloc(&k2, sizeof(double) * h_N * h_N);
   cudaMalloc(&V, sizeof(double) * h_N * h_N);
   cudaMalloc(&g, sizeof(double) * h_N * h_N);
   cudaMalloc(&S, sizeof(double) * h_N * h_N);
@@ -60,6 +62,7 @@ int main(void){
   double * y = new double[h_N * h_N];
   double * kx = new double[h_N * h_N];
   double * ky = new double[h_N * h_N];
+  double * h_k2 = new double[h_N * h_N];
 
   #pragma omp parallel for
   for (int i = 0; i < h_N; i++)
@@ -70,9 +73,10 @@ int main(void){
       y[i * h_N + j] = (0) + (j - 1) * h_dy;
       kx[i * h_N + j] = (0) + (i - 1) * h_dkx;
       ky[i * h_N + j] = (0) + (j - 1) * h_dky;
+      h_k2[i * h_N + j] = kx[i * h_N + j] * kx[i * h_N + j] + ky[i * h_N + j] * ky[i * h_N + j];
     }
   }
-
+  cudaMemcpy(k2, h_k2, sizeof(double) * h_N * h_N, cudaMemcpyHostToDevice);
   double * h_V = new double[h_N * h_N];
   #pragma omp parallel for
   for (int i = 0; i < h_N * h_N; i++)
@@ -100,8 +104,9 @@ int main(void){
   }  
   printf("Streams created.\n");
   
-
-
+  
+  compute_second_term(g, second_term, numBlocks, threadsPerBlock);
+  compute_omega(omega, k2, g, S, streams_x, streams_y, numBlocks, threadsPerBlock);
 
 
   printer_vector(x, y, g, "g2.dat", h_N);
@@ -118,6 +123,8 @@ int main(void){
   delete[] x;
   delete[] y;
   delete[] h_V;
+  delete[] h_k2;
+  cudaFree(k2);
   cudaFree(V);
   cudaFree(g);
   cudaFree(S);
