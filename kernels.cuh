@@ -256,9 +256,9 @@ __global__ void g_from_S3(
 __global__ void ifft_cossine_x_integral(
 	double *__restrict__ g,
 	const double *__restrict__ S,
-  int d_column)
+  int * index)
 {
-  int j = d_column;
+  int j = * index;
 	const unsigned int tid = threadIdx.x + blockIdx.x * blockDim.x;
 	double x_shfl_src, x_shfl_dest;
 	double y_val = 0.0;
@@ -298,9 +298,9 @@ __global__ void ifft_cossine_x_integral(
 
 __global__ void ifft_cossine_y_integral(
 	double *__restrict__ g,
-  int d_row)
+  int * index)
 {
-  int i = d_row;
+  int i = *index;
 	const unsigned int tid = threadIdx.y + blockIdx.y * blockDim.y;
 	double x_shfl_src, x_shfl_dest;
 	double y_val = 0.0;
@@ -339,9 +339,9 @@ __global__ void ifft_cossine_y_integral(
 __global__ void fft_cossine_x_integral(
 	const double *__restrict__ g,
 	double *__restrict__ S,
-  int d_column)
+  int * index)
 {
-  int j = d_column;
+  int j = *index;
 	const unsigned int tid = threadIdx.x + blockIdx.x * blockDim.x;
 	double x_shfl_src, x_shfl_dest;
 	double y_val = 0.0;
@@ -379,9 +379,9 @@ __global__ void fft_cossine_x_integral(
 
 __global__ void fft_cossine_y_integral(
 	double *__restrict__ S,
-  int d_row)
+  int * index)
 {
-  int i = d_row;
+  int i = *index;
 	const unsigned int tid = threadIdx.y + blockIdx.y * blockDim.y;
 	double x_shfl_src, x_shfl_dest;
 	double y_val = 0.0;
@@ -422,9 +422,9 @@ __global__ void ifft_omega_x_integral(
 	double *__restrict__ omega,
 	const double *__restrict__ k2,
 	const double *__restrict__ S,
-  int d_column)
+  int * index)
 {
-  int j = d_column;
+  int j = *index;
 	const unsigned int tid = threadIdx.x + blockIdx.x * blockDim.x;
 	double x_shfl_src, x_shfl_dest;
 	double y_val = 0.0;
@@ -465,9 +465,9 @@ __global__ void ifft_omega_x_integral(
 
 __global__ void ifft_omega_y_integral(
 	double *__restrict__ omega,
-  int d_row)
+  int * index)
 {
-  int i = d_row;
+  int i = *index;
 	const unsigned int tid = threadIdx.y + blockIdx.y * blockDim.y;
 	double x_shfl_src, x_shfl_dest;
 	double y_val = 0.0;
@@ -509,9 +509,9 @@ __global__ void fft_Vph_x_integral(
 	const double *__restrict__ g,
 	const double *__restrict__ omega,
 	double *__restrict__ Vph,
-  int d_column)
+  int * index)
 {
-  int j = d_column;
+  int j = *index;
 	const unsigned int tid = threadIdx.x + blockIdx.x * blockDim.x;
 	double x_shfl_src, x_shfl_dest;
 	double y_val = 0.0;
@@ -552,9 +552,9 @@ __global__ void fft_Vph_x_integral(
 
 __global__ void fft_Vph_y_integral(
 	double *__restrict__ Vph,
-  int d_row)
+  int * index)
 {
-  int i = d_row;
+  int i = *index;
 	const unsigned int tid = threadIdx.y + blockIdx.y * blockDim.y;
 	double x_shfl_src, x_shfl_dest;
 	double y_val = 0.0;
@@ -616,7 +616,7 @@ __global__ void update_S(double * S, const double *__restrict__ k2, const double
 	}
 }
 
-void FFT_g2S(const double * g, double * S, cudaStream_t * streams_x, cudaStream_t * streams_y, dim3 numBlocks, dim3 threadsPerBlock)
+/*void FFT_g2S(const double * g, double * S, cudaStream_t * streams_x, cudaStream_t * streams_y, dim3 numBlocks, dim3 threadsPerBlock)
 {
   #pragma unroll
   for (int i = 0; i < h_N; i++)
@@ -638,7 +638,7 @@ void FFT_g2S(const double * g, double * S, cudaStream_t * streams_x, cudaStream_
   {
     CUDA_CHECK(cudaStreamSynchronize(streams_y[i]));
   }
-}
+}*/
 
 void IFFT_S2g(double * g, 
 	const double * S, 
@@ -675,7 +675,7 @@ void compute_second_term(double * g, double * second_term, dim3 numBlocks, dim3 
 	kernel_compute_second_term<<<numBlocks, threadsPerBlock>>>(g, second_term);
 }
 
-void compute_omega(double * index, double * omega, double * k2, double * g, double * S, cudaEvent_t * events_x, cudaEvent_t * events_y, cudaStream_t * streams_x, cudaStream_t * streams_y, dim3 numBlocks, dim3 threadsPerBlock, int * index)
+void compute_omega(double * omega, double * k2, double * g, double * S, cudaEvent_t * events_x, cudaEvent_t * events_y, cudaStream_t * streams_x, cudaStream_t * streams_y, dim3 numBlocks, dim3 threadsPerBlock, int * index)
 {
   for (int i = 0; i < h_N; i++)
   {
