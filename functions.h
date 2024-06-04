@@ -252,7 +252,7 @@ void compute_omega(fftw_plan p_omega, double * k2, double * S, double * omega)
   fftw_execute(p_omega);
 }
 
-void compute_second_step(fftw_plan p_S, fftw_plan p_omega, double * k2, double * S, double * g, double * omega, double * V)
+void compute_nonKinetic_step(fftw_plan p_S, fftw_plan p_omega, double * k2, double * S, double * g, double * omega, double * V)
 {
   double alpha = 1;//(double)(P - 1) / (double)(N - 1);
   double c = rho * dx * dy * alpha * alpha;
@@ -278,7 +278,7 @@ void compute_second_step(fftw_plan p_S, fftw_plan p_omega, double * k2, double *
   #pragma omp parallel for
   for (int i = 0; i < N * N; i++)
   {
-    g[i] *= exp(-(V[i] + omega[i]) * dt);
+    g[i] *= exp(-(V[i] + omega[i]) * dt * 0.5);
   }
 }
 
@@ -289,8 +289,8 @@ void initialize_g_S(double * x, double * y, double * g, double * S)
   {
     for (int j = 0; j < N; j++)
     {
-      S[i * P + j] = 1.0;// - exp(-x[i] * x[i] - y[i] * y[i]);
-      g[i * P + j] = 1.0;
+      S[i * P + j] = 1.0;//- exp(-x[i] * x[i] - y[i] * y[i]);
+      g[i * P + j] = 1.0;//- exp(-x[i] * x[i] - y[i] * y[i]);
     }
   }
   return;  
@@ -531,6 +531,11 @@ void compute_kinetic_xfirst(double * expAx,
                     fftw_plan p_x, 
                     fftw_plan p_y)
 {
+  #pragma omp parallel for
+  for(int i = 0; i < N * N; i++)
+  {
+    g[i] -= 1.0;
+  }   
   fftw_execute(p_x);
   #pragma omp parallel for
   for(int i = 0; i < N * N; i++)
@@ -545,6 +550,11 @@ void compute_kinetic_xfirst(double * expAx,
     g[i] *= expAy[i];
   }  
   fftw_execute(p_y);
+  #pragma omp parallel for
+  for(int i = 0; i < N * N; i++)
+  {
+    g[i] += 1.0;
+  } 
 }
 
 void compute_kinetic_yfirst(double * expAx, 
@@ -568,6 +578,28 @@ void compute_kinetic_yfirst(double * expAx,
   }  
   fftw_execute(p_x);
 }
+
+void compute_kinetic_2D(double * g, double * expA, fftw_plan p_g)
+{
+  #pragma omp parallel for
+  for(int i = 0; i < N * N; i++)
+  {
+    g[i] = g[i] - 1.0;
+  }   
+  fftw_execute(p_g);
+  #pragma omp parallel for
+  for(int i = 0; i < N * N; i++)
+  {
+    g[i] *= expA[i];
+  }  
+  fftw_execute(p_g);
+  #pragma omp parallel for
+  for(int i = 0; i < N * N; i++)
+  {
+    g[i] = g[i] + 1.0;
+  }   
+}
+
 
 void normalize_f(double * f)
 {
@@ -656,7 +688,7 @@ void printer_loop_f(long int counter, double * k2, double * g, double * f, doubl
 
 void print_loop(double * x, double * y, double * k2, double * g, double * V, double * S, double * new_S, long int counter)
 {
-  if(counter%200 == 0 or counter == 1)
+  if(counter%500 == 0 or counter == 1)
   {
     new_energy = compute_energy(k2, g, new_S, V);
     double error = abs(new_energy - energy) / dt;
@@ -745,7 +777,7 @@ void preliminaries(double * k2,
   fftw_destroy_plan(p_Wy);
 }
 
-void preliminaries_TSSP(double * expAx, double * expAy)
+void preliminaries_TSSP(double * expAx, double * expAy, double * expA, double * k2)
 {
 
   double p = dkx; 
@@ -769,6 +801,17 @@ void preliminaries_TSSP(double * expAx, double * expAy)
       expAy[i * N + j] = exp(-temp) / (2.0 * ((double)N - 1.));
     }    
   } 
+
+  //Operator in the xy-plane
+  for (int i = 0; i < N; i++)
+  {    
+    for (int j = 0; j < N; j++)
+    {
+      double temp = (  k2[i * N + j]  ) * dt / 1.0;
+      expA[i * N + j] = exp(-temp) / (2.0 * ((double)N - 1.) * 2.0 * ((double)N - 1.));
+    }    
+  } 
+
 }
 
 #endif

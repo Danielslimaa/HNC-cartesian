@@ -22,6 +22,7 @@ __constant__ double dx;
 __constant__ double dy;
 __constant__ double dkx;
 __constant__ double dky;
+__constant__ double dt;
 int numStreams;
 int h_N;
 
@@ -297,7 +298,6 @@ __global__ void ifft_cossine_x_integral(
 
 __global__ void ifft_cossine_y_integral(
 	double *__restrict__ g,
-	const double *__restrict__ S,
   int d_row)
 {
   int i = d_row;
@@ -378,7 +378,6 @@ __global__ void fft_cossine_x_integral(
 }
 
 __global__ void fft_cossine_y_integral(
-	const double *__restrict__ g,
 	double *__restrict__ S,
   int d_row)
 {
@@ -609,6 +608,14 @@ __global__ void kernel_compute_second_term(double * g, double * second_term)
 	}
 }
 
+__global__ void update_S(double * S, const double *__restrict__ k2, const double *__restrict__ Vph)
+{
+	for (int i = blockIdx.x * blockDim.x + threadIdx.x;  i < N * N; i += blockDim.x * gridDim.x)
+	{
+		S[i] = (1.0 - dt) * S[i] + dt * sqrt(k2[i] / (k2[i] + 4.0 * Vph[i]));
+	}
+}
+
 void FFT_g2S(const double * g, double * S, cudaStream_t * streams_x, cudaStream_t * streams_y, dim3 numBlocks, dim3 threadsPerBlock)
 {
   #pragma unroll
@@ -624,7 +631,31 @@ void FFT_g2S(const double * g, double * S, cudaStream_t * streams_x, cudaStream_
   #pragma unroll
   for (int i = 0; i < h_N; i++)
   {
-    fft_cossine_y_integral<<<numBlocks, threadsPerBlock, 0, streams_y[i]>>>(g, S, i);
+    fft_cossine_y_integral<<<numBlocks, threadsPerBlock, 0, streams_y[i]>>>(S, i);
+  }  
+  #pragma unroll
+  for (int i = 0; i < h_N; i++) 
+  {
+    CUDA_CHECK(cudaStreamSynchronize(streams_y[i]));
+  }
+}
+
+void IFFT_S2g(double * g, const double * S, cudaStream_t * streams_x, cudaStream_t * streams_y, dim3 numBlocks, dim3 threadsPerBlock)
+{
+  #pragma unroll
+  for (int i = 0; i < h_N; i++)
+  {
+    ifft_cossine_x_integral<<<numBlocks, threadsPerBlock, 0, streams_x[i]>>>(g, S, i);
+  }
+  #pragma unroll
+  for (int i = 0; i < h_N; i++) 
+  {
+    CUDA_CHECK(cudaStreamSynchronize(streams_x[i]));
+  }  
+  #pragma unroll
+  for (int i = 0; i < h_N; i++)
+  {
+    ifft_cossine_y_integral<<<numBlocks, threadsPerBlock, 0, streams_y[i]>>>(g, i);
   }  
   #pragma unroll
   for (int i = 0; i < h_N; i++) 
@@ -661,3 +692,37 @@ void compute_omega(double * omega, double * k2, double * g, double * S, cudaStre
     CUDA_CHECK(cudaStreamSynchronize(streams_y[i]));
   }	
 }
+
+
+void compute_Vph_k(	const double *__restrict__ V,
+										const double *__restrict__ second_term,
+										const double *__restrict__ g,
+										const double *__restrict__ omega,
+										double *__restrict__ Vph,
+										cudaStream_t * streams_x, 
+										cudaStream_t * streams_y, 
+										dim3 numBlocks, 
+										dim3 threadsPerBlock)
+{
+  #pragma unroll
+  for (int i = 0; i < h_N; i++)
+  {
+    fft_Vph_x_integral<<<numBlocks, threadsPerBlock, 0, streams_x[i]>>>(V, second_term, g, omega, Vph, i);
+  }
+  #pragma unroll
+  for (int i = 0; i < h_N; i++) 
+  {
+    CUDA_CHECK(cudaStreamSynchronize(streams_x[i]));
+  }  
+  #pragma unroll
+  for (int i = 0; i < h_N; i++)
+  {
+    fft_Vph_y_integral<<<numBlocks, threadsPerBlock, 0, streams_y[i]>>>(Vph, i);
+  }  
+  #pragma unroll
+  for (int i = 0; i < h_N; i++) 
+  {
+    CUDA_CHECK(cudaStreamSynchronize(streams_y[i]));
+  }	
+}
+

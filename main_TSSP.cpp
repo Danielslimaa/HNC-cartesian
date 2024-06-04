@@ -15,7 +15,7 @@
 int main(void){
   void fftw_cleanup_threads(void);
   fftw_cleanup();
-  P = 1 << 7;
+  P = 1 << 9;
   N = P / 1;
   inv_N2 = 1. / ((double)((P - 1) * (P - 1)));
   L = 10.;
@@ -53,6 +53,7 @@ int main(void){
   double * Lg = (double *)fftw_malloc(sizeof(double) * P * P);
   double * expAx = (double *)fftw_malloc(sizeof(double) * P * P); 
   double * expAy = (double *)fftw_malloc(sizeof(double) * P * P);
+  double * expA = (double *)fftw_malloc(sizeof(double) * P * P);
 
   double p = dk;
 
@@ -105,19 +106,19 @@ int main(void){
   potential_V(x, y, k2, V, "QC_hexagonal");
   printer_field_transversal_view(x, y, V, "QC_hexagonal.dat");
   potential_V(x, y, k2, V, "GEM2");
-  preliminaries_TSSP(expAx, expAy);
+  preliminaries_TSSP(expAx, expAy, expA, k2);
   initialize_g_S(x, y, g, S);
 
   condition = true; 
   tolerance = 1e-6;
   long int counter = 1;
   while(condition)
-  {
-    compute_kinetic_xfirst(expAx, expAy, g, p_x, p_y);    
-    compute_second_step(p_S, p_omega, k2, S, g, omega, V);    
-    compute_kinetic_xfirst(expAx, expAy, g, p_x, p_y);  
-    
-    //normalize_g(g);    
+  {   
+    compute_nonKinetic_step(p_S, p_omega, k2, S, g, omega, V); 
+    compute_kinetic_2D(g, expA, p_g);
+    compute_nonKinetic_step(p_S, p_omega, k2, S, g, omega, V);
+
+ 
     print_loop(x, y, k2, g, V, S, new_S, counter);
     counter += 1;
   }
@@ -143,5 +144,6 @@ int main(void){
   fftw_free(Lg);
   fftw_free(expAx); 
   fftw_free(expAy);
+  fftw_free(expA);
   fftw_cleanup();
 }

@@ -20,6 +20,10 @@ int main(void)
   double h_dk = 13.0 / h_N;
   double h_dkx = h_dk;
   double h_dky = h_dkx;
+  double h_dt;
+  double U = 10.;
+
+  h_dt = 0.001;
   cudaMemcpyToSymbol(N, &h_N, sizeof(int), size_t(0), cudaMemcpyHostToDevice);
   cudaMemcpyToSymbol(h, &h_h, sizeof(double), size_t(0), cudaMemcpyHostToDevice);
   cudaMemcpyToSymbol(L, &h_L, sizeof(double), size_t(0), cudaMemcpyHostToDevice);
@@ -27,7 +31,8 @@ int main(void)
   cudaMemcpyToSymbol(dx, &h_dx, sizeof(double), size_t(0), cudaMemcpyHostToDevice);
   cudaMemcpyToSymbol(dy, &h_dy, sizeof(double), size_t(0), cudaMemcpyHostToDevice);
   cudaMemcpyToSymbol(dkx, &h_dkx, sizeof(double), size_t(0), cudaMemcpyHostToDevice);
-  cudaMemcpyToSymbol("dky", &h_dky, sizeof(double), size_t(0), cudaMemcpyHostToDevice);
+  cudaMemcpyToSymbol(dky, &h_dky, sizeof(double), size_t(0), cudaMemcpyHostToDevice);
+  cudaMemcpyToSymbol(dt, &h_dt, sizeof(double), size_t(0), cudaMemcpyHostToDevice);
   printf("N = %d, h = %f, L = %f\n", h_N, h_h, h_L);
 
   int Blocks_N, ThreadsPerBlock_N;
@@ -78,17 +83,20 @@ int main(void)
   }
   cudaMemcpy(k2, h_k2, sizeof(double) * h_N * h_N, cudaMemcpyHostToDevice);
   double * h_V = new double[h_N * h_N];
+  double * tmp = new double[h_N * h_N];
   #pragma omp parallel for
   for (int i = 0; i < h_N * h_N; i++)
   {
-    h_V[i] = exp( -x[i] * x[i] - y[i] * y[i] );
+    h_V[i] = U * exp( -x[i] * x[i] - y[i] * y[i] );
+    tmp[i] = 1.0;
   }  
   cudaMemcpy(V, h_V, sizeof(double) * h_N * h_N, cudaMemcpyHostToDevice);
   printer_vector(x, y, V, "U.dat", h_N);  
 
-  cudaMemcpy(g, h_V, sizeof(double) * h_N * h_N, cudaMemcpyHostToDevice);
-  cudaMemcpy(S, h_V, sizeof(double) * h_N * h_N, cudaMemcpyHostToDevice);
 
+  cudaMemcpy(g, tmp, sizeof(double) * h_N * h_N, cudaMemcpyHostToDevice);
+  cudaMemcpy(S, tmp, sizeof(double) * h_N * h_N, cudaMemcpyHostToDevice);
+  delete[] tmp;
   printer_vector(x, y, g, "g0.dat", h_N);
 
   numStreams = h_N; // Number of CUDA streams
@@ -104,12 +112,64 @@ int main(void)
   }  
   printf("Streams created.\n");
   
-  
-  compute_second_term(g, second_term, numBlocks, threadsPerBlock);
-  compute_omega(omega, k2, g, S, streams_x, streams_y, numBlocks, threadsPerBlock);
+  bool condition = true;
+  long int counter = 1;
+  while(counter < 4)
+  {
+    /*
+    compute_second_term(g, second_term, numBlocks, threadsPerBlock);
+    compute_omega(omega, k2, g, S, streams_x, streams_y, numBlocks, threadsPerBlock);
+    compute_Vph_k(V, second_term, g, omega, Vph, streams_x, streams_y, numBlocks, threadsPerBlock);
+    update_S<<<Blocks_N, ThreadsPerBlock_N>>>(S, k2, Vph);
+    IFFT_S2g(g, S, streams_x, streams_y, numBlocks, threadsPerBlock);
+    */
+    #pragma unroll
+    for (int i = 0; i < h_N; i++)
+    {
+      ifft_cossine_x_integral<<<numBlocks, threadsPerBlock, 0, streams_x[i]>>>(g, S, i);
+    }
+    #pragma unroll
+    for (int i = 0; i < h_N; i++) 
+    {
+      CUDA_CHECK(cudaStreamSynchronize(streams_x[i]));
+    }  
+    #pragma unroll
+    for (int i = 0; i < h_N; i++)
+    {
+      ifft_cossine_y_integral<<<numBlocks, threadsPerBlock, 0, streams_y[i]>>>(g, i);
+    }  
+    #pragma unroll
+    for (int i = 0; i < h_N; i++) 
+    {
+      CUDA_CHECK(cudaStreamSynchronize(streams_y[i]));
+    }
+    #pragma unroll
+    for (int i = 0; i < h_N; i++)
+    {
+      fft_cossine_x_integral<<<numBlocks, threadsPerBlock, 0, streams_x[i]>>>(g, S, i);
+    }
+    #pragma unroll
+    for (int i = 0; i < h_N; i++) 
+    {
+      CUDA_CHECK(cudaStreamSynchronize(streams_x[i]));
+    }  
+    #pragma unroll
+    for (int i = 0; i < h_N; i++)
+    {
+      fft_cossine_y_integral<<<numBlocks, threadsPerBlock, 0, streams_y[i]>>>(S, i);
+    }  
+    #pragma unroll
+    for (int i = 0; i < h_N; i++) 
+    {
+      CUDA_CHECK(cudaStreamSynchronize(streams_y[i]));
+    }
+    printf("\ri = %ld", counter);
+    counter++;
+  }
 
 
-  printer_vector(x, y, g, "g2.dat", h_N);
+
+  printer_vector(x, y, g, "g.dat", h_N);
   // Destroy each stream
   printf("Destroy each stream\n");
   for (int i = 0; i < numStreams; ++i) 
