@@ -640,24 +640,29 @@ void FFT_g2S(const double * g, double * S, cudaStream_t * streams_x, cudaStream_
   }
 }
 
-void IFFT_S2g(double * g, const double * S, cudaStream_t * streams_x, cudaStream_t * streams_y, dim3 numBlocks, dim3 threadsPerBlock)
+void IFFT_S2g(double * g, 
+	const double * S, 
+	cudaEvent_t * events_x, 
+	cudaEvent_t * events_y, 
+	cudaStream_t * streams_x, 
+	cudaStream_t * streams_y, 
+	dim3 numBlocks, 
+	dim3 threadsPerBlock)
 {
-  #pragma unroll
   for (int i = 0; i < h_N; i++)
   {
     ifft_cossine_x_integral<<<numBlocks, threadsPerBlock, 0, streams_x[i]>>>(g, S, i);
+		cudaEventRecord(events_x[i], streams_x[i]);
   }
-  #pragma unroll
   for (int i = 0; i < h_N; i++) 
   {
-    CUDA_CHECK(cudaStreamSynchronize(streams_x[i]));
+    cudaStreamWaitEvent(streams_x[i], events_x[i]);
   }  
-  #pragma unroll
   for (int i = 0; i < h_N; i++)
   {
     ifft_cossine_y_integral<<<numBlocks, threadsPerBlock, 0, streams_y[i]>>>(g, i);
+		cudaEventRecord(events_y[i], streams_y[i]);
   }  
-  #pragma unroll
   for (int i = 0; i < h_N; i++) 
   {
     CUDA_CHECK(cudaStreamSynchronize(streams_y[i]));
@@ -697,30 +702,30 @@ void compute_Vph_k(	const double *__restrict__ V,
 										const double *__restrict__ g,
 										const double *__restrict__ omega,
 										double *__restrict__ Vph,
+										cudaEvent_t * events_x, 
+										cudaEvent_t * events_y, 
 										cudaStream_t * streams_x, 
 										cudaStream_t * streams_y, 
 										dim3 numBlocks, 
 										dim3 threadsPerBlock)
 {
-  #pragma unroll
   for (int i = 0; i < h_N; i++)
   {
     fft_Vph_x_integral<<<numBlocks, threadsPerBlock, 0, streams_x[i]>>>(V, second_term, g, omega, Vph, i);
+		cudaEventRecord(events_x[i], streams_x[i]);
   }
-  #pragma unroll
   for (int i = 0; i < h_N; i++) 
   {
-    CUDA_CHECK(cudaStreamSynchronize(streams_x[i]));
+    cudaStreamWaitEvent(streams_x[i], events_x[i]);
   }  
-  #pragma unroll
   for (int i = 0; i < h_N; i++)
   {
     fft_Vph_y_integral<<<numBlocks, threadsPerBlock, 0, streams_y[i]>>>(Vph, i);
+		cudaEventRecord(events_y[i], streams_y[i]);
   }  
-  #pragma unroll
   for (int i = 0; i < h_N; i++) 
   {
-    CUDA_CHECK(cudaStreamSynchronize(streams_y[i]));
+    cudaStreamWaitEvent(streams_y[i], events_y[i]);
   }	
 }
 

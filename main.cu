@@ -103,12 +103,16 @@ int main(void)
   // Allocate memory for the array of streams
   cudaStream_t * streams_y = new cudaStream_t[numStreams];
   cudaStream_t * streams_x = new cudaStream_t[numStreams];
+  cudaEvent_t * events_x = new cudaEvent_t[numStreams];
+  cudaEvent_t * events_y = new cudaEvent_t[numStreams];
   // Create each stream
   printf("Create each stream\n");
   for (int i = 0; i < numStreams; ++i) 
   {
     CUDA_CHECK(cudaStreamCreate(&streams_y[i]));
     CUDA_CHECK(cudaStreamCreate(&streams_x[i]));
+    CUDA_CHECK(cudaEventCreate(&events_x[i]));
+    CUDA_CHECK(cudaEventCreate(&events_y[i]));
   }  
   printf("Streams created.\n");
   
@@ -116,13 +120,13 @@ int main(void)
   long int counter = 1;
   while(counter < 4)
   {
-    /*
+    
     compute_second_term(g, second_term, numBlocks, threadsPerBlock);
-    compute_omega(omega, k2, g, S, streams_x, streams_y, numBlocks, threadsPerBlock);
-    compute_Vph_k(V, second_term, g, omega, Vph, streams_x, streams_y, numBlocks, threadsPerBlock);
+    compute_omega(omega, k2, g, S, events_x, events_y, streams_x, streams_y, numBlocks, threadsPerBlock);
+    compute_Vph_k(V, second_term, g, omega, Vph, events_x, events_y, streams_x, streams_y, numBlocks, threadsPerBlock);
     update_S<<<Blocks_N, ThreadsPerBlock_N>>>(S, k2, Vph);
-    IFFT_S2g(g, S, streams_x, streams_y, numBlocks, threadsPerBlock);
-    */
+    IFFT_S2g(g, S, events_x, events_y, streams_x, streams_y, numBlocks, threadsPerBlock);
+    
 
   printer_vector(x, y, g, "g.dat", h_N);
   // Destroy each stream
@@ -131,6 +135,8 @@ int main(void)
   {
     CUDA_CHECK(cudaStreamDestroy(streams_y[i]));
     CUDA_CHECK(cudaStreamDestroy(streams_x[i]));
+    CUDA_CHECK(cudaEventDestroy(events_x[i]));
+    CUDA_CHECK(cudaEventDestroy(events_y[i]));
   }
   delete[] streams_y;
   delete[] streams_x;
