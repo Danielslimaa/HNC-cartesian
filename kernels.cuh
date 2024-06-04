@@ -669,27 +669,25 @@ void compute_second_term(double * g, double * second_term, dim3 numBlocks, dim3 
 	kernel_compute_second_term<<<numBlocks, threadsPerBlock>>>(g, second_term);
 }
 
-void compute_omega(double * omega, double * k2, double * g, double * S, cudaStream_t * streams_x, cudaStream_t * streams_y, dim3 numBlocks, dim3 threadsPerBlock)
+void compute_omega(double * index, double * omega, double * k2, double * g, double * S, cudaEvent_t * events_x, cudaEvent_t * events_y, cudaStream_t * streams_x, cudaStream_t * streams_y, dim3 numBlocks, dim3 threadsPerBlock)
 {
-  #pragma unroll
   for (int i = 0; i < h_N; i++)
   {
-    ifft_omega_x_integral<<<numBlocks, threadsPerBlock, 0, streams_x[i]>>>(omega, k2, S, i);
+    ifft_omega_x_integral<<<numBlocks, threadsPerBlock, 0, streams_x[i]>>>(omega, k2, S, &index[i]);
+		cudaEventRecord(events_x[i], streams_x[i]);
   }
-  #pragma unroll
   for (int i = 0; i < h_N; i++) 
   {
-    CUDA_CHECK(cudaStreamSynchronize(streams_x[i]));
+    cudaStreamWaitEvent(streams_x[i], events_x[i]);
   }  
-  #pragma unroll
   for (int i = 0; i < h_N; i++)
   {
-    ifft_omega_y_integral<<<numBlocks, threadsPerBlock, 0, streams_y[i]>>>(omega, i);
+    ifft_omega_y_integral<<<numBlocks, threadsPerBlock, 0, streams_y[i]>>>(omega, &index[i]);
+		cudaEventRecord(events_y[i], streams_y[i]);
   }  
-  #pragma unroll
   for (int i = 0; i < h_N; i++) 
   {
-    CUDA_CHECK(cudaStreamSynchronize(streams_y[i]));
+    cudaStreamWaitEvent(streams_y[i], events_y[i]);
   }	
 }
 

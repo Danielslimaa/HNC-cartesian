@@ -123,51 +123,6 @@ int main(void)
     update_S<<<Blocks_N, ThreadsPerBlock_N>>>(S, k2, Vph);
     IFFT_S2g(g, S, streams_x, streams_y, numBlocks, threadsPerBlock);
     */
-    #pragma unroll
-    for (int i = 0; i < h_N; i++)
-    {
-      ifft_cossine_x_integral<<<numBlocks, threadsPerBlock, 0, streams_x[i]>>>(g, S, i);
-    }
-    #pragma unroll
-    for (int i = 0; i < h_N; i++) 
-    {
-      CUDA_CHECK(cudaStreamSynchronize(streams_x[i]));
-    }  
-    #pragma unroll
-    for (int i = 0; i < h_N; i++)
-    {
-      ifft_cossine_y_integral<<<numBlocks, threadsPerBlock, 0, streams_y[i]>>>(g, i);
-    }  
-    #pragma unroll
-    for (int i = 0; i < h_N; i++) 
-    {
-      CUDA_CHECK(cudaStreamSynchronize(streams_y[i]));
-    }
-    #pragma unroll
-    for (int i = 0; i < h_N; i++)
-    {
-      fft_cossine_x_integral<<<numBlocks, threadsPerBlock, 0, streams_x[i]>>>(g, S, i);
-    }
-    #pragma unroll
-    for (int i = 0; i < h_N; i++) 
-    {
-      CUDA_CHECK(cudaStreamSynchronize(streams_x[i]));
-    }  
-    #pragma unroll
-    for (int i = 0; i < h_N; i++)
-    {
-      fft_cossine_y_integral<<<numBlocks, threadsPerBlock, 0, streams_y[i]>>>(S, i);
-    }  
-    #pragma unroll
-    for (int i = 0; i < h_N; i++) 
-    {
-      CUDA_CHECK(cudaStreamSynchronize(streams_y[i]));
-    }
-    printf("\ri = %ld", counter);
-    counter++;
-  }
-
-
 
   printer_vector(x, y, g, "g.dat", h_N);
   // Destroy each stream
