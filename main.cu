@@ -106,26 +106,31 @@ int main(void)
   cudaEvent_t * events_x = new cudaEvent_t[numStreams];
   cudaEvent_t * events_y = new cudaEvent_t[numStreams];
   // Create each stream
-  printf("Create each stream\n");
+  printf("Creating streams and cudaEvents\n");
+  int * h_index = new int[N];
   for (int i = 0; i < numStreams; ++i) 
   {
     CUDA_CHECK(cudaStreamCreate(&streams_y[i]));
     CUDA_CHECK(cudaStreamCreate(&streams_x[i]));
     CUDA_CHECK(cudaEventCreate(&events_x[i]));
     CUDA_CHECK(cudaEventCreate(&events_y[i]));
+    h_index[i] = i;
   }  
   printf("Streams created.\n");
-  
+  int * index;
+  cudaMalloc(&index, sizeof(int) * N);
+  cudaMemcpy(index, h_index, sizeof(int) * N, cudaMemcpyHostToDevice);
+  delete[] h_index;
   bool condition = true;
   long int counter = 1;
   while(counter < 4)
   {
     
     compute_second_term(g, second_term, numBlocks, threadsPerBlock);
-    compute_omega(omega, k2, g, S, events_x, events_y, streams_x, streams_y, numBlocks, threadsPerBlock);
-    compute_Vph_k(V, second_term, g, omega, Vph, events_x, events_y, streams_x, streams_y, numBlocks, threadsPerBlock);
+    compute_omega(omega, k2, g, S, events_x, events_y, streams_x, streams_y, numBlocks, threadsPerBlock, index);
+    compute_Vph_k(V, second_term, g, omega, Vph, events_x, events_y, streams_x, streams_y, numBlocks, threadsPerBlock, index);
     update_S<<<Blocks_N, ThreadsPerBlock_N>>>(S, k2, Vph);
-    IFFT_S2g(g, S, events_x, events_y, streams_x, streams_y, numBlocks, threadsPerBlock);
+    IFFT_S2g(g, S, events_x, events_y, streams_x, streams_y, numBlocks, threadsPerBlock, index);
     
 
   printer_vector(x, y, g, "g.dat", h_N);
@@ -153,6 +158,7 @@ int main(void)
   cudaFree(omega);
   cudaFree(Vph);
   cudaFree(second_term);
+  cudaFree(index);
   cudaDeviceReset();
   return 0;
 }
