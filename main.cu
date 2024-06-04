@@ -124,14 +124,13 @@ int main(void)
   bool condition = true;
   long int counter = 1;
   while(counter < 4)
-  {
-    
+  {    
     compute_second_term(g, second_term, numBlocks, threadsPerBlock);
     compute_omega(omega, k2, g, S, events_x, events_y, streams_x, streams_y, numBlocks, threadsPerBlock, index);
     compute_Vph_k(V, second_term, g, omega, Vph, events_x, events_y, streams_x, streams_y, numBlocks, threadsPerBlock, index);
     update_S<<<Blocks_N, ThreadsPerBlock_N>>>(S, k2, Vph);
     IFFT_S2g(g, S, events_x, events_y, streams_x, streams_y, numBlocks, threadsPerBlock, index);
-    
+  }  
 
   printer_vector(x, y, g, "g.dat", h_N);
   // Destroy each stream
