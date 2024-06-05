@@ -1,26 +1,18 @@
 #include "functions.h"
 
 //g++ main.cpp -w -lfftw3_omp -lfftw3 -fopenmp -lm -O3
+//https://chatgpt.com/share/f3da4ffd-be86-4c8e-bce5-26ab1a528a66
 
 int main(void)
 {
   void fftw_cleanup_threads(void);
   fftw_cleanup();
-<<<<<<< HEAD
-  padded_N = 1 << 8;
-  N = padded_N / 2;
-  inv_N2 = 1. / ((double)((padded_N - 1) * (padded_N - 1)));
-  L = 5.;
-  
-  double h = 2. * L / (double)(2. * (padded_N - 1));
-=======
   P = 1 << 12;
   N = P / 1;
   inv_N2 = 1. / ((double)((P - 1) * (P - 1)));
   L = 500.;
   
   double h = 2. * L / (double)(2 * (P - 1));
->>>>>>> 31e3fb0 (-)
   dx = h;
   dy = h;
   
@@ -94,11 +86,6 @@ int main(void)
     int numberwisdom = fftw_export_wisdom_to_filename(export_buffer);
   }
   initialize_g_S(x, y, g, S);
-<<<<<<< HEAD
-  printer_field_transversal_view(x, y, S, "Si.dat");
-  printer_field_transversal_view(x, y, g, "gi.dat");
-  memcpy(new_S, S, padded_N * padded_N * sizeof(double));
-=======
   
   compute_g(g_to_g, S, g);
   //printer_field2(g, "g0.dat");
@@ -107,7 +94,6 @@ int main(void)
   //printer_field_transversal_view(x, y, g, "gi.dat");
   memcpy(new_S, S, P * P * sizeof(double));
   //printer_field2(S, "initial_new_S.dat");
->>>>>>> 31e3fb0 (-)
   geometry(x, y, kx, ky, k2);
   /* The potential:
   a) The gaussian potential: "GEM2"
@@ -116,14 +102,9 @@ int main(void)
   d) The QC-hexagonal: "QC_hexagonal"
   e) The Qc-dodecagonal: "QC_dodecagonal"
   */
-<<<<<<< HEAD
-  potential_V(x, y, k2, V, "GEM2");
-  printer_field_transversal_view(x, y, V, "V.dat");
-=======
   potential_V(x, y, k2, V, "QC_hexagonal");
   
   printer_field2(V, "V.dat");
->>>>>>> 31e3fb0 (-)
   condition = true; 
   tolerance = 1e-6;
   long int counter = 1;
