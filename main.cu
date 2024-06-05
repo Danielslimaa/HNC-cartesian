@@ -11,7 +11,7 @@
 
 int main(void)
 {
-  h_N = 1 << 8;
+  h_N = 1 << 10;
   double h_L = 10;
   double h_h = h_L / h_N;
   double h_rho = 1;
@@ -23,7 +23,7 @@ int main(void)
   double h_dt;
   double U = 10.;
 
-  h_dt = 0.001;
+  h_dt = 0.01;
   cudaMemcpyToSymbol(N, &h_N, sizeof(int), size_t(0), cudaMemcpyHostToDevice);
   cudaMemcpyToSymbol(h, &h_h, sizeof(double), size_t(0), cudaMemcpyHostToDevice);
   cudaMemcpyToSymbol(L, &h_L, sizeof(double), size_t(0), cudaMemcpyHostToDevice);
@@ -34,6 +34,7 @@ int main(void)
   cudaMemcpyToSymbol(dky, &h_dky, sizeof(double), size_t(0), cudaMemcpyHostToDevice);
   cudaMemcpyToSymbol(dt, &h_dt, sizeof(double), size_t(0), cudaMemcpyHostToDevice);
   printf("N = %d, h = %f, L = %f\n", h_N, h_h, h_L);
+  printer_constants<<<1,1>>>();
 
   int Blocks_N, ThreadsPerBlock_N;
   if (h_N * h_N >= 1024)
@@ -123,14 +124,14 @@ int main(void)
   delete[] h_index;
   bool condition = true;
   long int counter = 1;
-  while(counter < 4)
+  while(counter < 10)
   {    
     compute_second_term(g, second_term, numBlocks, threadsPerBlock);
     compute_omega(omega, k2, g, S, events_x, events_y, streams_x, streams_y, numBlocks, threadsPerBlock, index);
     compute_Vph_k(V, second_term, g, omega, Vph, events_x, events_y, streams_x, streams_y, numBlocks, threadsPerBlock, index);
     update_S<<<Blocks_N, ThreadsPerBlock_N>>>(S, k2, Vph);
     IFFT_S2g(g, S, events_x, events_y, streams_x, streams_y, numBlocks, threadsPerBlock, index);
-    printf("counter = %ld\n", counter);
+    if(counter%1 == 0) {printf("counter = %ld\n", counter); printer_vector(x, y, g, "g.dat", h_N);}
     counter++;
   }  
 

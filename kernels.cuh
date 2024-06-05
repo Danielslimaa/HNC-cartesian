@@ -68,6 +68,11 @@ __device__ double Shared_mem_sum(double shared_vals[])
     return shared_vals[my_lane];
 }
 
+__global__ void printer_constants()
+{
+	printf("GPU: N = %d, dt = %f, rho = %f\n", N, dt, rho);
+}
+
 __global__ void DCT_x(
 	double *__restrict__ X,
 	double *__restrict__ Y
