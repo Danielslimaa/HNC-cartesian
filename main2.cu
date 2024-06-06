@@ -11,7 +11,7 @@
 
 int main(void)
 {
-  h_N = 1 << 8;
+  h_N = 1 << 3;
   double h_L = 10;
   double h_h = h_L / h_N;
   double h_rho = 1;
@@ -92,7 +92,7 @@ int main(void)
   for (int i = 0; i < h_N * h_N; i++)
   {
     h_V[i] = U * exp( -h_x[i] * h_x[i] - h_y[i] * h_y[i] );
-    tmp[i] = exp( -h_x[i] * h_x[i] - h_y[i] * h_y[i] );
+    tmp[i] = 1;//exp( -h_x[i] * h_x[i] - h_y[i] * h_y[i] );
   }  
   cudaMemcpy(V, h_V, sizeof(double) * h_N * h_N, cudaMemcpyHostToDevice);
   printer_vector(h_x, h_y, V, "U.dat", h_N);  
@@ -102,6 +102,7 @@ int main(void)
   delete[] tmp;
   printer_vector(h_x, h_y, g, "g0.dat", h_N);
 
+  /*
   //FFT_x<<<Blocks_N, ThreadsPerBlock_N>>>(g, x, kx);
   cudaDeviceSynchronize();
   FFT_y<<<Blocks_N, ThreadsPerBlock_N>>>(g, y, ky);
@@ -112,8 +113,9 @@ int main(void)
   cudaDeviceSynchronize();
   IFFT_y<<<Blocks_N, ThreadsPerBlock_N>>>(g, y, ky);  
   cudaDeviceSynchronize();
-
-  printer_vector(h_x, h_y, g, "g.dat", h_N);
+  */
+  printer_array(g, "g.dat", h_N);
+  //printer_vector(h_x, h_y, g, "g.dat", h_N);
 
   delete[] h_x;
   delete[] h_y;

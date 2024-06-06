@@ -183,6 +183,22 @@ void printer_vector(double * x, double * y, double *vetor, const char *name, int
 	return;
 }
 
+void printer_array(double *vetor, const char *name, int h_N)
+{
+	double * h_vetor = new double[h_N * h_N];
+	cudaMemcpy(h_vetor, vetor, sizeof(double) * h_N * h_N, cudaMemcpyDeviceToHost);
+	std::ofstream myfile;
+	myfile.open(name);
+	for (int i = 0; i < h_N; ++i)
+	{
+		for (int j = 0; j < h_N; ++j) myfile << h_vetor[i * h_N + j] << "	";
+		myfile << "\n";		
+	}
+	myfile.close();
+	delete[] h_vetor;
+	return;
+}
+
 __global__ void initialize_geometry(double * x, double * y)
 {
     CUDA_GRID_STRIDE_LOOP(i, N)
@@ -621,7 +637,8 @@ __global__ void update_S(double * S, const double *__restrict__ k2, const double
 	}
 }
 
-/*void FFT_g2S(const double * g, double * S, cudaStream_t * streams_x, cudaStream_t * streams_y, dim3 numBlocks, dim3 threadsPerBlock)
+/*
+void FFT_g2S(const double * g, double * S, cudaStream_t * streams_x, cudaStream_t * streams_y, dim3 numBlocks, dim3 threadsPerBlock)
 {
   #pragma unroll
   for (int i = 0; i < h_N; i++)
@@ -643,7 +660,8 @@ __global__ void update_S(double * S, const double *__restrict__ k2, const double
   {
     CUDA_CHECK(cudaStreamSynchronize(streams_y[i]));
   }
-}*/
+}
+*/
 
 void IFFT_S2g(double * g, 
 	const double * S, 
