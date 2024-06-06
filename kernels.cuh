@@ -918,3 +918,4 @@ __global__ void laplace(double * k2, double * g)
 		g[i] *= -k2[i];
 	}
 }
+
