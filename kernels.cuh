@@ -297,7 +297,7 @@ __global__ void ifft_cossine_x_integral(
 
 	if (tid < N)
 	{
-		g[tid] = y_val;
+		g[tid * N + j] = y_val;
 	}
 }
 
@@ -337,7 +337,7 @@ __global__ void ifft_cossine_y_integral(
 	}
 	if (tid < N)
 	{
-		g[tid] = 1.0 + (y_val * c);
+		g[i * N + tid] = 1.0 + (y_val * c);
 	}
 }
 
@@ -454,7 +454,7 @@ __global__ void ifft_omega_x_integral(
 			// --- Column-major ordering - faster
 			x_shfl_dest = __shfl_sync(0xffffffff, x_shfl_src, e);
 			// y_val += d_j0table[tid * nCols + (e + BLOCK_SIZE * m)] * x_shfl_dest;
-			y_val += cos(double(tid) * dx * double(e + BLOCK_SIZE * m) * dkx) * x_shfl_dest;
+			y_val += cos(dx * double(tid * N + e + BLOCK_SIZE * m) * dkx) * x_shfl_dest;
 			// --- Row-major ordering - slower
 			// y_val += d_V_ph_k[tid * nCols + (e + BLOCK_SIZE * m)] * x_shared[e];
 		}
@@ -464,7 +464,7 @@ __global__ void ifft_omega_x_integral(
 
 	if (tid < N)
 	{
-		omega[tid] = y_val;
+		omega[tid * N + j] = y_val;
 	}
 }
 
@@ -496,7 +496,7 @@ __global__ void ifft_omega_y_integral(
 			// --- Column-major ordering - faster
 			x_shfl_dest = __shfl_sync(0xffffffff, x_shfl_src, e);
 			// y_val += d_j0table[tid * nCols + (e + BLOCK_SIZE * m)] * x_shfl_dest;
-			y_val += cos(double(tid) * dy * double(e + BLOCK_SIZE * m) * dky) * x_shfl_dest;
+			y_val += cos(dy * double(tid * N + e + BLOCK_SIZE * m) * dky) * x_shfl_dest;
 			// --- Row-major ordering - slower
 			// y_val += d_V_ph_k[tid * nCols + (e + BLOCK_SIZE * m)] * x_shared[e];
 		}
@@ -504,7 +504,7 @@ __global__ void ifft_omega_y_integral(
 	}
 	if (tid < N)
 	{
-		omega[tid] = y_val * c;
+		omega[i * N + tid] = y_val * c;
 	}
 }
 
@@ -542,7 +542,7 @@ __global__ void fft_Vph_x_integral(
 			// --- Column-major ordering - faster
 			x_shfl_dest = __shfl_sync(0xffffffff, x_shfl_src, e);
 			// y_val += d_j0table[tid * nCols + (e + BLOCK_SIZE * m)] * x_shfl_dest;
-			y_val += cos(double(tid) * dx * double(e + BLOCK_SIZE * m) * dkx) * x_shfl_dest;
+			y_val += cos(dx * double(tid * N + e + BLOCK_SIZE * m) * dkx) * x_shfl_dest;
 			// --- Row-major ordering - slower
 			// y_val += d_V_ph_k[tid * nCols + (e + BLOCK_SIZE * m)] * x_shared[e];
 		}
@@ -551,7 +551,7 @@ __global__ void fft_Vph_x_integral(
 
 	if (tid < N)
 	{
-		Vph[tid] = y_val;
+		Vph[tid * N + j] = y_val;
 	}
 }
 
@@ -583,7 +583,7 @@ __global__ void fft_Vph_y_integral(
 			// --- Column-major ordering - faster
 			x_shfl_dest = __shfl_sync(0xffffffff, x_shfl_src, e);
 			// y_val += d_j0table[tid * nCols + (e + BLOCK_SIZE * m)] * x_shfl_dest;
-			y_val += cos(double(tid) * dy * double(e + BLOCK_SIZE * m) * dky) * x_shfl_dest;
+			y_val += cos(dy * double(tid * N + e + BLOCK_SIZE * m) * dky) * x_shfl_dest;
 			// --- Row-major ordering - slower
 			// y_val += d_V_ph_k[tid * nCols + (e + BLOCK_SIZE * m)] * x_shared[e];
 		}
@@ -592,7 +592,7 @@ __global__ void fft_Vph_y_integral(
 
 	if (tid < N)
 	{
-		Vph[tid] = c * y_val;
+		Vph[i * N + tid] = c * y_val;
 	}
 }
 
@@ -736,3 +736,185 @@ void compute_Vph_k(	const double *__restrict__ V,
   }	
 }
 
+__global__ void FFT_x(
+	double *__restrict__ g,
+	const double *__restrict__ x,
+	const double *__restrict__ kx)
+{
+	const unsigned int tid = threadIdx.x + blockIdx.x * blockDim.x;
+
+	double x_shfl_src, x_shfl_dest;
+
+	double y_val = 0.0;
+
+	#pragma unroll
+	for (unsigned int m = 0; m < ((N + BLOCK_SIZE - 1) / BLOCK_SIZE); ++m)
+	{
+		if ((m * BLOCK_SIZE + threadIdx.x) < N)
+		{
+			x_shfl_src = g[threadIdx.x + m * BLOCK_SIZE];
+		}
+		else
+		{
+			x_shfl_src = 0.0;
+		}
+		__syncthreads();
+
+		//        #pragma unroll
+		for (int e = 0; e < 32; ++e)
+		{
+			// --- Column-major ordering - faster
+			x_shfl_dest = __shfl_sync(0xffffffff, x_shfl_src, e);
+			// y_val += d_j0table[tid * nCols + (e + BLOCK_SIZE * m)] * x_shfl_dest;
+			y_val += cos(kx[tid * N + (e + BLOCK_SIZE * m)] * x[tid * N + (e + BLOCK_SIZE * m)]) * x_shfl_dest;
+			// --- Row-major ordering - slower
+			// y_val += d_V_ph_k[tid * nCols + (e + BLOCK_SIZE * m)] * x_shared[e];
+		}
+
+		__syncthreads();
+	}
+
+	if (tid < N)
+	{
+		g[tid] = y_val * dx;
+	}
+}
+
+__global__ void FFT_y(
+	double *__restrict__ g,
+	const double *__restrict__ y,
+	const double *__restrict__ ky)
+{
+	const unsigned int tid = threadIdx.x + blockIdx.x * blockDim.x;
+
+	double x_shfl_src, x_shfl_dest;
+
+	double y_val = 0.0;
+
+	#pragma unroll
+	for (unsigned int m = 0; m < ((N + BLOCK_SIZE - 1) / BLOCK_SIZE); ++m)
+	{
+		if ((m * BLOCK_SIZE + threadIdx.x) < N)
+		{
+			x_shfl_src = g[threadIdx.x + m * BLOCK_SIZE];
+		}
+		else
+		{
+			x_shfl_src = 0.0;
+		}
+		__syncthreads();
+
+		//        #pragma unroll
+		for (int e = 0; e < 32; ++e)
+		{
+			// --- Column-major ordering - faster
+			x_shfl_dest = __shfl_sync(0xffffffff, x_shfl_src, e);
+			// y_val += d_j0table[tid * nCols + (e + BLOCK_SIZE * m)] * x_shfl_dest;
+			y_val += cos(ky[tid * N + (e + BLOCK_SIZE * m)] * y[tid * N + (e + BLOCK_SIZE * m)]) * x_shfl_dest;
+			// --- Row-major ordering - slower
+			// y_val += d_V_ph_k[tid * nCols + (e + BLOCK_SIZE * m)] * x_shared[e];
+		}
+
+		__syncthreads();
+	}
+
+	if (tid < N)
+	{
+		g[tid] = y_val * dy;
+	}
+}
+
+__global__ void IFFT_x(
+	double *__restrict__ g,
+	const double *__restrict__ x,
+	const double *__restrict__ kx)
+{
+	const unsigned int tid = threadIdx.x + blockIdx.x * blockDim.x;
+
+	double x_shfl_src, x_shfl_dest;
+
+	double y_val = 0.0;
+
+	#pragma unroll
+	for (unsigned int m = 0; m < ((N + BLOCK_SIZE - 1) / BLOCK_SIZE); ++m)
+	{
+		if ((m * BLOCK_SIZE + threadIdx.x) < N)
+		{
+			x_shfl_src = g[threadIdx.x + m * BLOCK_SIZE];
+		}
+		else
+		{
+			x_shfl_src = 0.0;
+		}
+		__syncthreads();
+
+		//        #pragma unroll
+		for (int e = 0; e < 32; ++e)
+		{
+			// --- Column-major ordering - faster
+			x_shfl_dest = __shfl_sync(0xffffffff, x_shfl_src, e);
+			// y_val += d_j0table[tid * nCols + (e + BLOCK_SIZE * m)] * x_shfl_dest;
+			y_val += cos(x[tid * N + (e + BLOCK_SIZE * m)] * kx[tid * N + (e + BLOCK_SIZE * m)]) * x_shfl_dest;
+			// --- Row-major ordering - slower
+			// y_val += d_V_ph_k[tid * nCols + (e + BLOCK_SIZE * m)] * x_shared[e];
+		}
+
+		__syncthreads();
+	}
+
+	if (tid < N)
+	{
+		g[tid] = y_val * dkx;
+	}
+}
+
+__global__ void IFFT_y(
+	double *__restrict__ g,
+	const double *__restrict__ y,
+	const double *__restrict__ ky)
+{
+	const unsigned int tid = threadIdx.x + blockIdx.x * blockDim.x;
+
+	double x_shfl_src, x_shfl_dest;
+
+	double y_val = 0.0;
+	double c = 1.0 / (2.0 * M_PI * 2.0 * M_PI);
+	#pragma unroll
+	for (unsigned int m = 0; m < ((N + BLOCK_SIZE - 1) / BLOCK_SIZE); ++m)
+	{
+		if ((m * BLOCK_SIZE + threadIdx.x) < N)
+		{
+			x_shfl_src = g[threadIdx.x + m * BLOCK_SIZE];
+		}
+		else
+		{
+			x_shfl_src = 0.0;
+		}
+		__syncthreads();
+
+		//        #pragma unroll
+		for (int e = 0; e < 32; ++e)
+		{
+			// --- Column-major ordering - faster
+			x_shfl_dest = __shfl_sync(0xffffffff, x_shfl_src, e);
+			// y_val += d_j0table[tid * nCols + (e + BLOCK_SIZE * m)] * x_shfl_dest;
+			y_val += cos(y[tid * N + (e + BLOCK_SIZE * m)] * ky[tid * N + (e + BLOCK_SIZE * m)]) * x_shfl_dest;
+			// --- Row-major ordering - slower
+			// y_val += d_V_ph_k[tid * nCols + (e + BLOCK_SIZE * m)] * x_shared[e];
+		}
+		__syncthreads();
+	}
+
+	if (tid < N)
+	{
+		g[tid] = y_val * dky * c;
+	}
+}
+
+__global__ void laplace(double * k2, double * g)
+{
+	for(int i = blockIdx.x * blockDim.x + threadIdx.x;  i < N * N; i += blockDim.x * gridDim.x)
+	{
+		g[i] *= -k2[i];
+	}
+}

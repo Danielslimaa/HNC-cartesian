@@ -124,14 +124,14 @@ int main(void)
   delete[] h_index;
   bool condition = true;
   long int counter = 1;
-  while(counter < 10)
+  while(counter < 200)
   {    
     compute_second_term(g, second_term, numBlocks, threadsPerBlock);
     compute_omega(omega, k2, g, S, events_x, events_y, streams_x, streams_y, numBlocks, threadsPerBlock, index);
     compute_Vph_k(V, second_term, g, omega, Vph, events_x, events_y, streams_x, streams_y, numBlocks, threadsPerBlock, index);
     update_S<<<Blocks_N, ThreadsPerBlock_N>>>(S, k2, Vph);
     IFFT_S2g(g, S, events_x, events_y, streams_x, streams_y, numBlocks, threadsPerBlock, index);
-    if(counter%1 == 0) {printf("counter = %ld\n", counter); printer_vector(x, y, g, "g.dat", h_N);}
+    if(counter%100 == 0) {printf("counter = %ld\n", counter); printer_vector(x, y, g, "g.dat", h_N);}
     counter++;
   }  
 
