@@ -3,7 +3,7 @@
 
 #define MAX_BLKSZ 1024
 #define WARPSZ 32
-#define BLOCK_SIZE 32
+#define BLOCK_SIZE 16
 
 #define PI M_PI
 
@@ -937,3 +937,44 @@ __global__ void laplace(double * k2, double * g)
 	}
 }
 
+__global__ void ffty_test(
+	double *__restrict__ S,
+	double *__restrict__ g,
+  int * index)
+{
+  int i = *index;
+	const unsigned int tid = threadIdx.x + blockIdx.x * blockDim.x;
+	double x_shfl_src, x_shfl_dest;
+	double y_val = 0.0;
+  #pragma unroll
+	for (unsigned int m = 0; m < ((N + BLOCK_SIZE - 1) / BLOCK_SIZE); ++m)
+	{
+		if ((m * BLOCK_SIZE + threadIdx.x) < N)
+		{
+			x_shfl_src = S[i * N + (threadIdx.x + m * BLOCK_SIZE)];
+		}
+		else
+		{
+			x_shfl_src = 0.0;
+		}
+		__syncthreads();
+
+		#pragma unroll
+		for (int e = 0; e < 32; ++e)
+		{
+			// --- Column-major ordering - faster
+			x_shfl_dest = __shfl_sync(0xffffffff, x_shfl_src, e);
+
+			// y_val += d_j0table[tid * nCols + (e + BLOCK_SIZE * m)] * x_shfl_dest;
+			y_val += S[tid + (e + BLOCK_SIZE * m)] * x_shfl_dest;
+			// --- Row-major ordering - slower
+			// y_val += d_V_ph_k[tid * nCols + (e + BLOCK_SIZE * m)] * x_shared[e];
+		}
+		__syncthreads();
+	}
+
+	if (tid < N)
+	{
+		S[i * N + tid] = y_val;
+	}
+}

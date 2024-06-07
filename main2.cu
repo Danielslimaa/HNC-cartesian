@@ -11,7 +11,7 @@
 
 int main(void)
 {
-  h_N = 1 << 3;
+  h_N = 1 << 7;
   double h_L = 10;
   double h_h = h_L / h_N;
   double h_rho = 1;
@@ -101,6 +101,16 @@ int main(void)
   cudaMemcpy(S, tmp, sizeof(double) * h_N * h_N, cudaMemcpyHostToDevice);
   delete[] tmp;
   printer_vector(h_x, h_y, g, "g0.dat", h_N);
+  int * h_index = new int[h_N];
+  for (int i = 0; i < h_N; ++i) 
+  {
+    h_index[i] = i;
+  }
+
+  int * index;
+  cudaMalloc(&index, sizeof(int) * h_N);
+  cudaMemcpy(index, h_index, sizeof(int) * h_N, cudaMemcpyHostToDevice);
+  delete[] h_index;
 
   /*
   //FFT_x<<<Blocks_N, ThreadsPerBlock_N>>>(g, x, kx);
@@ -114,7 +124,10 @@ int main(void)
   IFFT_y<<<Blocks_N, ThreadsPerBlock_N>>>(g, y, ky);  
   cudaDeviceSynchronize();
   */
+
+  ffty_test<<<1, h_N>>>(S, g, &index[5]);
   printer_array(g, "g.dat", h_N);
+  printer_array(S, "S.dat", h_N);
   //printer_vector(h_x, h_y, g, "g.dat", h_N);
 
   delete[] h_x;
@@ -133,6 +146,7 @@ int main(void)
   cudaFree(omega);
   cudaFree(Vph);
   cudaFree(second_term);
+  cudaFree(index);
   cudaDeviceReset();
   return 0;
 }
