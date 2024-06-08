@@ -252,6 +252,20 @@ void compute_omega(fftw_plan p_omega, double * k2, double * S, double * omega)
   fftw_execute(p_omega);
 }
 
+void isotropic_compute_omega(double * k2, double * S, double * omega)
+{
+  double c = - dkx * dky * ( 1.0 / (2.0 * M_PI * rho) ) * 0.25;
+  #pragma omp parallel for 
+  for (int i = 0; i < N; i++)
+  {
+    for (int j = 0; j < N; j++)
+    {
+      double aux = ( 1. - (1. / (S[i * N + j])) );
+      omega[i * N + j] = c * k2[i * N + j] * ( 2. * S[i * N + j] + 1. ) * aux * aux; 
+    }
+  }  
+}
+
 void compute_nonKinetic_step(fftw_plan p_S, fftw_plan p_omega, double * k2, double * S, double * g, double * omega, double * V)
 {
   double alpha = 1;//(double)(P - 1) / (double)(N - 1);
@@ -334,6 +348,18 @@ void compute_Vph(double * V, double * g, double * omega, double * Vph)
       Vph[i * P + j] += (  g[i * P + j] - 1.  ) * omega[i * P + j];
     } 
   }   
+}
+
+void isotropic_compute_Vph(double * V, double * g, double * omega, double * Vph)
+{
+  #pragma omp parallel for 
+  for (int i = 0; i < N - 4; i++)
+  {
+    Vph[i] = g[i] * V[i];
+    double delx_g = 2. * g[i + 3] - 9. * g[i + 2] + 18. * g[i + 1] - 11. * g[i];
+    Vph[i] += (delx_g * delx_g) / (6. * dx * 6. * dx * 4. * g[i]);
+    Vph[i] += (  g[i] - 1.  ) * omega[i];
+  }   
   return;
 }
 
@@ -362,6 +388,19 @@ void update_S(fftw_plan Vph_to_Vph, double * k2, double * Vph, double * S)
   return;
 }
 
+void isotropic_update_S(double * k2, double * Vph, double * S)
+{
+  double alpha = 1;//(double)(P - 1) / (double)(N - 1);
+  double c = rho * dx * dy * alpha * alpha;
+  #pragma omp parallel for 
+  for (int i = 0; i < N; i++)
+  {
+    Vph[i] *= c;
+    double dS = sqrt( k2[i] / ( k2[i] + 4.0 * Vph[i ]) ) ;
+    S[i] = (1. - dt) * S[i] + dt * dS;
+  } 
+}
+
 void compute_g(fftw_plan g_to_g, double * S, double * g)
 {
   double c = dkx * dky / (2. * M_PI * 2. * M_PI * rho);
@@ -381,6 +420,31 @@ void compute_g(fftw_plan g_to_g, double * S, double * g)
     }
   }
   fftw_execute(g_to_g);
+  #pragma omp parallel for 
+  for (int i = 0; i < P; i++)
+  {
+    for (int j = 0; j < P; j++)
+    {
+      if (i >= N || j >= N)
+      {
+        g[i * P + j] = 0;
+      }
+      else
+      {
+        g[i * P + j] = 1. + c * g[i * P + j]; 
+      }
+    }
+  } 
+}
+
+void isotropic_compute_g(double * S, double * g)
+{
+  double c = dkx * dky / (2. * M_PI * rho);
+  #pragma omp parallel for 
+  for (int i = 0; i < N; i++)
+  {
+    g[i] = S[i] - 1.0; 
+  }
   #pragma omp parallel for 
   for (int i = 0; i < P; i++)
   {

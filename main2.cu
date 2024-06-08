@@ -17,7 +17,7 @@ int main(void)
   double h_rho = 1;
   double h_dx = h_L / h_N;
   double h_dy = h_dx;
-  double h_dk = 5.0 / h_N;
+  double h_dk = M_PI / h_L;
   double h_dkx = h_dk;
   double h_dky = h_dkx;
   double h_dt;
@@ -126,8 +126,13 @@ int main(void)
   */
 
   ffty_test<<<1, h_N>>>(S, g, &index[5]);
+  printer_array(S, "S1.dat", h_N);
+  iffty_test<<<1, h_N>>>(S, g, &index[5]);
+  
+  //IFFT_y<<<1, h_N>>>(g, y, ky, &index[2]);
+
   printer_array(g, "g.dat", h_N);
-  printer_array(S, "S.dat", h_N);
+  printer_array(S, "S2.dat", h_N);
   //printer_vector(h_x, h_y, g, "g.dat", h_N);
 
   delete[] h_x;

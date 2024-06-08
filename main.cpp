@@ -7,10 +7,10 @@ int main(void)
 {
   void fftw_cleanup_threads(void);
   fftw_cleanup();
-  P = 1 << 12;
+  P = 1 << 9;
   N = P / 1;
   inv_N2 = 1. / ((double)((P - 1) * (P - 1)));
-  L = 500.;
+  L = 10.;
   
   double h = 2. * L / (double)(2 * (P - 1));
   dx = h;
@@ -20,12 +20,12 @@ int main(void)
   dkx = dk;
   dky = dk;
 
-  U = 0.00001;
+  U = 10.;
   rho = 1.0;
   dt = 0.001;
   printf("N = %d, L = %1.0f, h = %1.6f, dk = %1.6f\n", N, L, h, dkx);
   printf("U = %1.2f, rho = %1.2f, dt = %1.4f\n", U, rho, dt);
-  int max_threads = 8;//omp_get_max_threads() / 2; // 16 cores 
+  int max_threads = 16;//omp_get_max_threads() / 2; // 16 cores 
   printf("Maximum number of threads = %d\n", max_threads);
   omp_set_num_threads(max_threads);
 
@@ -59,7 +59,7 @@ int main(void)
   memset(Lg, 0, sizeof(double) * P * P);
 
   unsigned flags;
-  bool with_wisdom = true;
+  bool with_wisdom = false;
   if(with_wisdom)
   {
     flags = FFTW_WISDOM_ONLY;
@@ -102,7 +102,7 @@ int main(void)
   d) The QC-hexagonal: "QC_hexagonal"
   e) The Qc-dodecagonal: "QC_dodecagonal"
   */
-  potential_V(x, y, k2, V, "QC_hexagonal");
+  potential_V(x, y, k2, V, "GEM2");
   
   printer_field2(V, "V.dat");
   condition = true; 
