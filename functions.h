@@ -255,11 +255,18 @@ void compute_omega(fftw_plan p_omega, double * k2, double * S, double * omega)
 void isotropic_compute_omega(double * k2, double * S, double * omega)
 {
   double c = -dk * dk * dk * dk * ( 1.0 / (2.0 * M_PI * rho) ) * 0.25;
+  double tmp, sum;
   #pragma omp parallel for 
   for (int i = 0; i < N; i++)
   {
-    double aux = ( 1. - (1. / (S[i])) );
-    omega[i] = c * i * i * i * ( 2. * S[i] + 1. ) * aux * aux; 
+    sum = 0;
+    #pragma omp parallel for reduction(+ : sum) private(tmp)
+    for (int j = 0; j < N; j++)
+    {
+      tmp = ( 1. - (1. / (S[i])) );
+      sum += c * i * i * i * ( 2. * S[i] + 1. ) * aux * aux; 
+    }  
+    omega[i] = sum; 
   }  
 }
 
