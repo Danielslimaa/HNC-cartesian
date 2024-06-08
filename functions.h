@@ -440,10 +440,13 @@ void compute_g(fftw_plan g_to_g, double * S, double * g)
 void isotropic_compute_g(double * S, double * g)
 {
   double c = dkx * dky / (2. * M_PI * rho);
-  #pragma omp parallel for 
+  double tmp;
+  double  sum = 0;
+  #pragma omp parallel for reduction(+ : sum) private(tmp)
   for (int i = 0; i < N; i++)
   {
-    g[i] = S[i] - 1.0; 
+    tmp = S[i] - 1.0; 
+    g[i] = tmp;
   }
   #pragma omp parallel for 
   for (int i = 0; i < P; i++)
