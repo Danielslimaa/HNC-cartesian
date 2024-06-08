@@ -452,7 +452,7 @@ void isotropic_compute_g(double * S, double * g)
       tmp = j0f(i * j * c2) * (S[j] - 1.0); 
       sum += tmp;
     }
-    g[i] = sum * c1;
+    g[i] = 1.0 + c1 * sum;
   }
 }
 
