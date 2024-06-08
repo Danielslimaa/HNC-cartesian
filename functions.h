@@ -14,7 +14,7 @@
 int N, P;
 double inv_N2;
 double L; 
-double dx, dy, dkx, dky;
+double dx, dy, dr, dkx, dky, dk;
 double U;
 double rho;
 double dt;
@@ -254,15 +254,12 @@ void compute_omega(fftw_plan p_omega, double * k2, double * S, double * omega)
 
 void isotropic_compute_omega(double * k2, double * S, double * omega)
 {
-  double c = - dkx * dky * ( 1.0 / (2.0 * M_PI * rho) ) * 0.25;
+  double c = -dk * dk * dk * dk * ( 1.0 / (2.0 * M_PI * rho) ) * 0.25;
   #pragma omp parallel for 
   for (int i = 0; i < N; i++)
   {
-    for (int j = 0; j < N; j++)
-    {
-      double aux = ( 1. - (1. / (S[i * N + j])) );
-      omega[i * N + j] = c * k2[i * N + j] * ( 2. * S[i * N + j] + 1. ) * aux * aux; 
-    }
+    double aux = ( 1. - (1. / (S[i])) );
+    omega[i] = c * i * i * i * ( 2. * S[i] + 1. ) * aux * aux; 
   }  
 }
 
@@ -390,13 +387,10 @@ void update_S(fftw_plan Vph_to_Vph, double * k2, double * Vph, double * S)
 
 void isotropic_update_S(double * k2, double * Vph, double * S)
 {
-  double alpha = 1;//(double)(P - 1) / (double)(N - 1);
-  double c = rho * dx * dy * alpha * alpha;
   #pragma omp parallel for 
   for (int i = 0; i < N; i++)
   {
-    Vph[i] *= c;
-    double dS = sqrt( k2[i] / ( k2[i] + 4.0 * Vph[i ]) ) ;
+    double dS = sqrt( k2[i] / ( k2[i] + 4.0 * Vph[i ]) );
     S[i] = (1. - dt) * S[i] + dt * dS;
   } 
 }
@@ -485,6 +479,34 @@ double compute_energy(double * k2, double * g, double * S, double * V)
 
       sum += tmp;
     } 
+  } 
+  return sum;
+}
+
+double isotropic_compute_energy(double * k2, double * g, double * S, double * V)
+{
+  double c1 = (2. * M_PI * rho / 2.) * dx * dy;
+  double c2 = - (1. / 8.) * ( 1.0 / (2.0 * M_PI * rho) ) * dkx * dky;
+  double c3 = - (rho / 2.) * 0.25 * 2.0 * M_PI;
+  double sum, tmp = 0;
+  #pragma omp parallel for reduction(+ : sum) private(tmp)
+  for (int i = 0; i < N - 4; i++)
+  {
+    double aux = S[i] - 1.;
+    tmp = c1 * V[i] * g[i];
+    double second_term = 0;
+    if(i == 0)
+    {
+      second_term = 0;
+    }
+    else
+    {
+      second_term = c2 * k2[i] * aux * aux * aux / (S[i]);
+    }
+    tmp += second_term;
+    tmp += c3 * g[i] * ( log(g[i + 2]) - 2. * log(g[i + 1]) + log(g[i]) );
+
+    sum += tmp; 
   } 
   return sum;
 }
@@ -748,7 +770,7 @@ void print_loop(double * x, double * y, double * k2, double * g, double * V, dou
 {
   if(counter%500 == 0 or counter == 1)
   {
-    new_energy = compute_energy(k2, g, new_S, V);
+    new_energy = isotropic_compute_energy(k2, g, new_S, V);
     double error = abs(new_energy - energy) / dt;
     //double error = compute_S_error(new_S, S); 
     bool aux_condition = error > tolerance;

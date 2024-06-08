@@ -5,18 +5,20 @@
 
 int main(void)
 {
-  void fftw_cleanup_threads(void);
-  fftw_cleanup();
-  P = 1 << 9;
+  P = 1 << 11;
   N = P / 1;
   inv_N2 = 1. / ((double)((P - 1) * (P - 1)));
-  L = 10.;
+  L = 40.;
   
   double h = 2. * L / (double)(2 * (P - 1));
   dx = h;
   dy = h;
+
+  dr = h;
+
+  dk = h;
   
-  double dk = 2. * M_PI / (2. * L); // dk = 2*pi/(2*L)
+  //dk = 2. * M_PI / (2. * L); // dk = 2*pi/(2*L)
   dkx = dk;
   dky = dk;
 
@@ -42,27 +44,20 @@ int main(void)
   double * omega = new double[N];
   double * Lg = new double[N];
 
-  memset(x, 0, sizeof(double) * P * P);
-  memset(y, 0, sizeof(double) * P * P);
-  memset(kx, 0, sizeof(double) * P * P);
-  memset(ky, 0, sizeof(double) * P * P);
-  memset(k2, 0, sizeof(double) * P * P);
-  memset(V, 0, sizeof(double) * P * P);
-  memset(g, 0, sizeof(double) * P * P);
-  memset(S, 0, sizeof(double) * P * P);
-  memset(Vph, 0, sizeof(double) * P * P);
-  memset(new_S, 0, sizeof(double) * P * P);
-  memset(omega, 0, sizeof(double) * P * P);
-  memset(Lg, 0, sizeof(double) * P * P);
+  #pragma omp parallel for 
+  for (int i = 0; i < N; i++)
+  {
+    g[i] = 1.0;
+    S[i] = 1.0;
+  }
 
-  initialize_g_S(x, y, g, S);
-  
-  compute_g(g_to_g, S, g);
+
+  isotropic_compute_g(S, g);
   //printer_field2(g, "g0.dat");
   //printer_field2(S, "S0.dat");
   //printer_field_transversal_view(x, y, S, "Si.dat");
   //printer_field_transversal_view(x, y, g, "gi.dat");
-  memcpy(new_S, S, P * P * sizeof(double));
+  memcpy(new_S, S, N * sizeof(double));
   //printer_field2(S, "initial_new_S.dat");
   geometry(x, y, kx, ky, k2);
   /* The potential:
@@ -72,21 +67,31 @@ int main(void)
   d) The QC-hexagonal: "QC_hexagonal"
   e) The Qc-dodecagonal: "QC_dodecagonal"
   */
-  potential_V(x, y, k2, V, "GEM2");
+  //potential_V(x, y, k2, V, "GEM2");
   
+
+  #pragma omp parallel for 
+  for (int i = 0; i < N; i++)
+  {
+    g[i] = 1.0;
+    S[i] = 1.0;
+    V[i] = exp(-pow(i * dr, 2));
+  }
+
+
   printer_field2(V, "V.dat");
   condition = true; 
   tolerance = 1e-6;
   long int counter = 1;
   while(condition)
   {
-    isotropic_compute_omega(omega_to_omega, k2, S, omega);
+    isotropic_compute_omega(k2, S, omega);
     //printer_field2(omega, "omega1.dat");
     isotropic_compute_Vph(V, g, omega, Vph);
     //printer_field2(Vph, "Vph1.dat");
-    isotropic_update_S(Vph_to_Vph, k2, Vph, S);
+    isotropic_update_S(k2, Vph, S);
     //printer_field2(S, "S1.dat");
-    isotropic_compute_g(g_to_g, S, g);
+    isotropic_compute_g(S, g);
     //printer_field2(g, "g1.dat");
     print_loop(x, y, k2, g, V, S, new_S, counter);    
     counter += 1;
