@@ -7,10 +7,10 @@ int main(void)
 {
   void fftw_cleanup_threads(void);
   fftw_cleanup();
-  P = 1 << 9;
+  P = 1 << 12;
   N = P / 1;
   inv_N2 = 1. / ((double)((P - 1) * (P - 1)));
-  L = 10.;
+  L =  40.;
   
   double h = 2. * L / (double)(2 * (P - 1));
   dx = h;
@@ -22,7 +22,7 @@ int main(void)
 
   U = 10.;
   rho = 1.0;
-  dt = 0.001;
+  dt = 0.01;
   printf("N = %d, L = %1.0f, h = %1.6f, dk = %1.6f\n", N, L, h, dkx);
   printf("U = %1.2f, rho = %1.2f, dt = %1.4f\n", U, rho, dt);
   int max_threads = 16;//omp_get_max_threads() / 2; // 16 cores 
@@ -59,7 +59,7 @@ int main(void)
   memset(Lg, 0, sizeof(double) * P * P);
 
   unsigned flags;
-  bool with_wisdom = false;
+  bool with_wisdom = true;
   if(with_wisdom)
   {
     flags = FFTW_WISDOM_ONLY;
@@ -111,62 +111,12 @@ int main(void)
   while(condition)
   {
     compute_omega(omega_to_omega, k2, S, omega);
-    //printer_field2(omega, "omega1.dat");
     compute_Vph(V, g, omega, Vph);
-    //printer_field2(Vph, "Vph1.dat");
     update_S(Vph_to_Vph, k2, Vph, S);
-    //printer_field2(S, "S1.dat");
     compute_g(g_to_g, S, g);
-    //printer_field2(g, "g1.dat");
     print_loop(x, y, k2, g, V, S, new_S, counter);    
     counter += 1;
   }
-/*
-    compute_omega(omega_to_omega, k2, S, omega);
-    printer_field2(omega, "omega2.dat");
-    compute_Vph(V, g, omega, Vph);
-    printer_field2(Vph, "Vph2.dat");
-    update_S(Vph_to_Vph, k2, Vph, S);
-    printer_field2(S, "S2.dat");
-    compute_g(g_to_g, S, g);
-    printer_field2(g, "g2.dat");
-    print_loop(x, y, k2, g, V, S, new_S, counter);    
-    counter += 1;
-
-
-    compute_omega(omega_to_omega, k2, S, omega);
-    printer_field2(omega, "omega3.dat");
-    compute_Vph(V, g, omega, Vph);
-    printer_field2(Vph, "Vph3.dat");
-    update_S(Vph_to_Vph, k2, Vph, S);
-    printer_field2(S, "S3.dat");
-    compute_g(g_to_g, S, g);
-    printer_field2(g, "g3.dat");
-    print_loop(x, y, k2, g, V, S, new_S, counter);    
-    counter += 1;    
-
-    compute_omega(omega_to_omega, k2, S, omega);
-    printer_field2(omega, "omega4.dat");
-    compute_Vph(V, g, omega, Vph);
-    printer_field2(Vph, "Vph4.dat");
-    update_S(Vph_to_Vph, k2, Vph, S);
-    printer_field2(S, "S4.dat");
-    compute_g(g_to_g, S, g);
-    printer_field2(g, "g4.dat");
-    print_loop(x, y, k2, g, V, S, new_S, counter);    
-    counter += 1;
-
-    compute_omega(omega_to_omega, k2, S, omega);
-    printer_field2(omega, "omega5.dat");
-    compute_Vph(V, g, omega, Vph);
-    printer_field2(Vph, "Vph5.dat");
-    update_S(Vph_to_Vph, k2, Vph, S);
-    printer_field2(S, "S5.dat");
-    compute_g(g_to_g, S, g);
-    printer_field2(g, "g5.dat");
-    print_loop(x, y, k2, g, V, S, new_S, counter);    
-    counter += 1;
-*/
   printf("\nThe computation has ended. Printing the fields.\n");
   printer_field(x, y, g, "g_full.dat");
   printer_field(x, y, S, "S_full.dat");

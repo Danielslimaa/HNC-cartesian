@@ -11,6 +11,8 @@
 #include <omp.h>
 #include <fftw3.h>
 
+#define POTDD_ASYMPTOTIC(a)   2. - 3. * (1. - 1. / (2. * a * a) + 3. / (4. * a * a * a * a) - 15. / (8. * a * a * a * a * a * a))
+
 int N, P;
 double inv_N2;
 double L; 
@@ -22,6 +24,21 @@ double energy, new_energy;
 bool condition;
 double tolerance;
 double lambda, new_lambda;
+
+double Dipolar2D(double q)
+{
+  double result, aux;
+  if(q >= 26)
+  {
+    aux = POTDD_ASYMPTOTIC(q);//1.0 / (std::sqrt(M_PI));
+  }
+  else{
+    aux = q * std::exp(q * q) * (1.0 - erf(q));
+    result = 2.0 - 3.0 * std::sqrt(M_PI) * aux;
+  }
+
+  return result;
+}
 
 void printer_field(double * x, double * y, double *vetor, const char * name)
 {
@@ -155,6 +172,24 @@ void potential_V(double * x, double * y, double * k2, double * V, const char * n
       
     }
   } 
+  if (name == "Dipolar_Perpendicular")
+  {
+    double C_h = 0.33;
+    double theta = 1.08;
+    double sin_theta = sin(theta);
+    double dl = 1;//L / double(N);
+    printf("dl = %1.6f\n", dl);
+
+    printf("Dipolar potential initialized with normalized dz = %2.4f\n", dz);
+    #pragma omp parallel for
+    for (int i = 0; i < N * N; i++)
+    {
+      double k = sqrt(mu2_p[i] + lambda2_q[i]); 
+      double q = dz * k / std::sqrt(2.0);
+      V[i] = (  1.0 / (   dz * sqrt(2.0 * M_PI)  )  ) * Dipolar2D(q) * inv_N2;
+    }
+    fftw_plan tmp = fftw_plan_r2r_2d(P, P, V, V, FFTW_REDFT00, FFTW_REDFT00, flags);
+  } 
   if (name == "QC_hexagonal")
   {
     #pragma omp parallel for
@@ -264,7 +299,7 @@ void isotropic_compute_omega(double * k2, double * S, double * omega)
     for (int j = 0; j < N; j++)
     {
       tmp = ( 1. - (1. / (S[i])) );
-      sum += c * i * i * i * ( 2. * S[i] + 1. ) * aux * aux; 
+      sum += c * i * i * i * ( 2. * S[i] + 1. ) * tmp * tmp; 
     }  
     omega[i] = sum; 
   }  
@@ -349,7 +384,7 @@ void compute_Vph(double * V, double * g, double * omega, double * Vph)
       double dely_g = 2. * g[i * P + j + 3] - 9. * g[i * P + j + 2] + 18. * g[i * P + j + 1] - 11. * g[i * P + j];
       double delx_g = 2. * g[(i + 3) * P + j] - 9. * g[(i + 2) * P + j] + 18. * g[(i + 1) * P + j] - 11. * g[i * P + j];
       Vph[i * P + j] += (delx_g * delx_g + dely_g * dely_g) / (6. * dx * 6. * dx * 4. * g[i * P + j]);
-      Vph[i * P + j] += (  g[i * P + j] - 1.  ) * omega[i * P + j];
+      Vph[i * P + j] += (  g[i * P + j] - 1.0  ) * omega[i * P + j];
     } 
   }   
 }
@@ -410,14 +445,7 @@ void compute_g(fftw_plan g_to_g, double * S, double * g)
   {
     for (int j = 0; j < P; j++)
     {
-      if (i >= N || j >= N)
-      {
-        g[i * P + j] = 0;
-      }
-      else
-      {
-        g[i * P + j] = S[i * P + j] - 1.0; 
-      }
+      g[i * P + j] = S[i * P + j] - 1.0; 
     }
   }
   fftw_execute(g_to_g);
@@ -426,14 +454,7 @@ void compute_g(fftw_plan g_to_g, double * S, double * g)
   {
     for (int j = 0; j < P; j++)
     {
-      if (i >= N || j >= N)
-      {
-        g[i * P + j] = 0;
-      }
-      else
-      {
-        g[i * P + j] = 1. + c * g[i * P + j]; 
-      }
+      g[i * P + j] = 1. + c * g[i * P + j]; 
     }
   } 
 }
@@ -459,8 +480,7 @@ void isotropic_compute_g(double * S, double * g)
 
 double compute_energy(double * k2, double * g, double * S, double * V)
 {
-  double alpha = (double)(P - 1) / (double)(N - 1);
-  double c1 = (rho / 2.) * dx * dy * alpha * alpha;
+  double c1 = (rho / 2.) * dx * dy;
   double c2 = - (1. / 8.) * ( 1. / (2. * M_PI * 2. * M_PI * rho) ) * dkx * dky;
   double c3 = - (rho / 2.) * 0.25;
   double sum, tmp = 0;
@@ -492,9 +512,9 @@ double compute_energy(double * k2, double * g, double * S, double * V)
 
 double isotropic_compute_energy(double * k2, double * g, double * S, double * V)
 {
-  double c1 = (2. * M_PI * rho / 2.) * dx * dy;
-  double c2 = - (1. / 8.) * ( 1.0 / (2.0 * M_PI * rho) ) * dkx * dky;
-  double c3 = - (rho / 2.) * 0.25 * 2.0 * M_PI;
+  double c1 = (rho / 2.) * dx * dy;
+  double c2 = - (1. / 8.) * ( 1.0 / (2.0 * M_PI * 2.0 * M_PI * rho) ) * dkx * dky;
+  double c3 = - (rho / 2.) * 0.25;
   double sum, tmp = 0;
   #pragma omp parallel for reduction(+ : sum) private(tmp)
   for (int i = 0; i < N - 4; i++)
@@ -775,9 +795,9 @@ void printer_loop_f(long int counter, double * k2, double * g, double * f, doubl
 
 void print_loop(double * x, double * y, double * k2, double * g, double * V, double * S, double * new_S, long int counter)
 {
-  if(counter%500 == 0 or counter == 1)
+  if(counter%10 == 0 or counter == 1)
   {
-    new_energy = isotropic_compute_energy(k2, g, new_S, V);
+    new_energy = compute_energy(k2, g, new_S, V);
     double error = abs(new_energy - energy) / dt;
     //double error = compute_S_error(new_S, S); 
     bool aux_condition = error > tolerance;

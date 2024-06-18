@@ -15,10 +15,10 @@
 int main(void){
   void fftw_cleanup_threads(void);
   fftw_cleanup();
-  P = 1 << 9;
+  P = 1 << 8;
   N = P / 1;
   inv_N2 = 1. / ((double)((P - 1) * (P - 1)));
-  L = 10.;
+  L = 5.;
   
   double h = 2. * L / (double)(2 * (P - 1));
   dx = h;
